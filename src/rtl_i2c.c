@@ -47,12 +47,12 @@ u8 i2s_rx_buf[I2S_DMA_PAGE_SIZE*I2S_DMA_PAGE_NUM];
 #define I2S_MCK_PIN			PB_23
 */
 
-// Muon
+// Muon/M-SoM
 #define I2S_SCLK_PIN			PB_20
 #define I2S_WS_PIN			PA_4
 #define I2S_SD_TX_PIN			PA_1
 #define I2S_SD_RX_PIN		PA_0
-#define I2S_MCK_PIN			NC
+#define I2S_MCK_PIN			PA_12
 
 
 #if defined(SAMPLE_FILE)

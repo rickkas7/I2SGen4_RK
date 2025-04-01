@@ -53,11 +53,11 @@ have a checkmark in the rightmost column.
 
 | Pin | Pin Name | Description | MCU | Used on Muon |
 | :---: | :--- | :--- | :--- | :---: |
-| 36 | TX / D9 | Serial TX, PWM, GPIO, SPI1 MOSI, I2S MCLK | PA[12] | |
+| 36 | TX / D9 | Serial TX, PWM, GPIO, SPI1 MOSI, I2S MCLK | PA[12] | &check; |
 | 17 | D21 | D21 GPIO, I2S RX | PA[0] | &check; |
 | 19 | D20 | D20 GPIO, I2S TX | PA[1] | &check; |
 | 59 | D26 | D26 GPIO, I2S WS | PA[4] | &check; |
-| 68 | D5 | D5 GPIO, PWM, I2S TX | PB[19] | |
+| 68 | D5 | D5 GPIO, PWM, I2S TX | PB[19] | &check; |
 | 70 | D6 | D6 GPIO, PWM, I2S CLK | PB[20] | &check; |
 | 72 | D7 | D7 GPIO, PWM, I2S WS | PB[21] | |
 
@@ -85,3 +85,21 @@ The following pins are used for I2S.
 
 
 The Muon is only compatible with Raspberry Pi expansion cards that support I2S on the PCM pins, not cards that use raw PCM frames.
+
+
+These are non-standard pins for I2S for the Raspberry Pi 40-pin HAT connector, though the RTL8722DM does support these as alternate pins for I2s:
+
+| Pin | Pin Name | Description | M2 Pin | MCU | Raspberry Pi |
+| :---: | :--- | :--- | :--- | :--- | :--- |
+|  8 | TX | Serial TX, PWM, GPIO, SPI1 MOSI, I2S MCLK | PA[12] | GPIO14 (TX) |
+| 32 | D5 | D5 GPIO, PWM, I2S TX | PB[19] | GPIO12 (PWM0) |
+
+Muon Test:
+
+| Color  | Pin  | Function | MCU    | Pi              | Channel | 
+| :----- | :--- | :------- | :----- | :-------------- | :--- |
+| Gray   |  6   | GND      | GND    | GND             |      | 
+| White  | 12   | CLK      | PB[20] | PCM_CLK GPIO18  | 0    |
+| Purple | 35   | WS       | PA[4]  | PCM_FS GPIO19   | 1    |
+| Blue   | 40   | TX       | PA[1]  | PCM_DOUT GPIO21 | 2    |
+
