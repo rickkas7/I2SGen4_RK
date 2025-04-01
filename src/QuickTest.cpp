@@ -1,6 +1,6 @@
 #include "Particle.h"
 
-#include "rtl_i2c.h"
+#include "rtl_i2s.h"
 
 SYSTEM_MODE(SEMI_AUTOMATIC);
 
