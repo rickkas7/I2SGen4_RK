@@ -2,7 +2,7 @@
 // This file can only contain interface code to the RTL SDK and not anything that interfaces
 // to the Particle platform.
 #include "i2s_api.h" 
-#include "alc5651.h"
+// #include "alc5651.h"
 
 i2s_t i2s_obj;
 
@@ -12,7 +12,7 @@ i2s_t i2s_obj;
 u8 i2s_tx_buf[I2S_DMA_PAGE_SIZE*I2S_DMA_PAGE_NUM];
 u8 i2s_rx_buf[I2S_DMA_PAGE_SIZE*I2S_DMA_PAGE_NUM];
 
-#define SAMPLE_FILE
+// #define SAMPLE_FILE
 #define SAMPLE_FILE_RATE 8000//44100
 #define SAMPLE_FILE_CHNUM 2
 
@@ -52,7 +52,7 @@ u8 i2s_rx_buf[I2S_DMA_PAGE_SIZE*I2S_DMA_PAGE_NUM];
 #define I2S_WS_PIN			PA_4
 #define I2S_SD_TX_PIN			PA_1
 #define I2S_SD_RX_PIN		PA_0
-#define I2S_MCK_PIN			PA_12
+#define I2S_MCK_PIN			NC
 
 
 #if defined(SAMPLE_FILE)
@@ -126,7 +126,7 @@ short test_sine16[16]={0, 12539/4, 23170/4, 30273/4, 32767/4, 30273/4, 23170/4, 
 int test_sine24[16]={0, 12539*256/4, 23170*256/4, 30273*256/4, 32767*256/4, 30273*256/4, 23170*256/4, 12539*256/4,
                   0, -12539*256/4, -23170*256/4, -30273*256/4, -32767*256/4, -30273*256/4, -23170*256/4, -12539*256/4};
 
-extern void wait_ms(u32);
+extern void wait_ms(long);
 
 #include <math.h>
 short remap_level_to_signed_16_bit(float val)
@@ -206,13 +206,6 @@ void test_tx_complete(void *data, char *pbuf)
     int *ptx_buf;
     
     i2s_t *obj = (i2s_t *)data;
-    static u32 count=0;
-    //DBG_8195A_I2S_LVL(VERI_I2S_LVL, "I2S%d %s\n",pI2SDemoHnd->DevNum,__func__);
-    count++;
-    if ((count&1023) == 1023)
-    {
-         DBG_8195A("%s \n", __func__);
-    }
 
     ptx_buf = i2s_get_tx_page(obj);
     //ptx_buf = (int*)pbuf;
@@ -236,13 +229,6 @@ void test_rx_complete(void *data, char* pbuf)
 {
     i2s_t *obj = (i2s_t *)data;
     int *ptx_buf;
-
-    static u32 count=0;
-    count++;
-    if ((count&1023) == 1023)
-    {
-         DBG_8195A("%s \n", __func__);
-    }
 
     //ptx_buf = i2s_get_tx_page(obj);
     //_memcpy((void*)ptx_buf, (void*)pbuf, I2S_DMA_PAGE_SIZE);
@@ -330,8 +316,8 @@ void runTest(void)
 //	i2s_deinit(&i2s_obj);
 	i2s_disable(&i2s_obj);
 
-	alc5651_set_word_len(2);	
-	alc5651_reg_dump();
+	// alc5651_set_word_len(2);	
+	// alc5651_reg_dump();
     
 	i2s_enable(&i2s_obj);
 	// Stereo, 24bit

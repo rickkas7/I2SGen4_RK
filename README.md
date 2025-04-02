@@ -94,7 +94,7 @@ These are non-standard pins for I2S for the Raspberry Pi 40-pin HAT connector, t
 |  8 | TX | Serial TX, PWM, GPIO, SPI1 MOSI, I2S MCLK | PA[12] | GPIO14 (TX) |
 | 32 | D5 | D5 GPIO, PWM, I2S TX | PB[19] | GPIO12 (PWM0) |
 
-Muon Test:
+Muon Test 1:
 
 | Color  | Pin  | Function | MCU    | Pi              | Channel | 
 | :----- | :--- | :------- | :----- | :-------------- | :--- |
@@ -103,3 +103,32 @@ Muon Test:
 | Purple | 35   | WS       | PA[4]  | PCM_FS GPIO19   | 1    |
 | Blue   | 40   | TX       | PA[1]  | PCM_DOUT GPIO21 | 2    |
 
+[Adafruit UDA1334 I2S breakout](https://www.adafruit.com/product/3678)
+
+| Side  | Pin  | Label | Connection | Description | Color |
+| :---- | ---: | :---- | :--- | :--- | :--- |
+| Short |  1   | SCLK  | NC   | Optional 27 MHz system clock in, not used | |
+| Short |  2   | SF1   | NC  | SF0 & SF1 LOW or NC for I2S mode | |
+| Short |  3   | MUTE  | NC  | NC or LOW for normal operation, HIGH for mute | |
+| Short |  4   | SF0   | NC  | SF0 & SF1 LOW or NC for I2S mode | |
+| Short |  5   | PLL   | NC  | LOW or NC for I2S audio mode | |
+| Short |  6   | DEEM  | NC  | De-emphasis mode, not sure how this works | |
+| Long  |  1   | VIN   | 3V3 | Voltage in (3.3V to 5V) | Red |
+| Long  |  2   | 3VO   | NC  | 3.3V output | |
+| Long  |  3   | GND   | GND | Ground | Black |
+| Long  |  4   | WSEL  | WS  | I2S WS/FS (word select) | White |
+| Long  |  5   | DIN   | TX  | I2S DOUT/TX | Gray |
+| Long  |  6   | BCLK  | CLK | Bit clock | Brown |
+| Long  |  7   | LOUT  | NC  | Audio output, left (also on 3.5mm jack) | |
+| Long  |  8   | AGND  | NC  | Audio output, ground (also on 3.5mm jack) | |
+| Long  |  1   | ROUT  | NC  | Audio output, right (also on 3.5mm jack) | |
+
+Muon test 2:
+
+| Color  | Pin  | Function | MCU    | Pi              |
+| :----- | :--- | :------- | :----- | :-------------- |
+| Red    |  1   | 3V3      | 3V3    | 3V3             |      
+| Black  |  6   | GND      | GND    | GND             |
+| Brown  | 12   | CLK      | PB[20] | PCM_CLK GPIO18  |
+| White  | 35   | WS       | PA[4]  | PCM_FS GPIO19   |
+| Gray   | 40   | TX       | PA[1]  | PCM_DOUT GPIO21 |
