@@ -1,4 +1,5 @@
 # I2SGen4_RK
+
 I2S (sound) support for Particle Gen 4 (RTL872x) devices
 
 
@@ -32,6 +33,7 @@ The following pins are used for PDM:
 | 43 | A1 / D12 | A1 Analog in, PDM DAT, GPIO | PB[2] |
 | 50 | A0 / D11 | A0 Analog in, PDM CLK, GPIO | PB[1] |
 
+To use PDM, use the [Microphone_PDM](https://github.com/particle-iot/Microphone_PDM) library.
 
 ### Photon 2
 
@@ -44,6 +46,7 @@ PDM (digital microphone, DMIC) is supported on the Photon 2 on pins A0 and A1.
 | A0 / D11 | A0 Analog in, PDM CLK, GPIO | PB[1] |
 | A1 / D12 | A1 Analog in, PDM DAT, GPIO | PB[2] |
 
+To use PDM, use the [Microphone_PDM](https://github.com/particle-iot/Microphone_PDM) library.
 
 
 ### M-SoM
@@ -53,13 +56,13 @@ have a checkmark in the rightmost column.
 
 | Pin | Pin Name | Description | MCU | Used on Muon |
 | :---: | :--- | :--- | :--- | :---: |
-| 36 | TX / D9 | Serial TX, PWM, GPIO, SPI1 MOSI, I2S MCLK | PA[12] | &check; |
-| 17 | D21 | D21 GPIO, I2S RX | PA[0] | &check; |
-| 19 | D20 | D20 GPIO, I2S TX | PA[1] | &check; |
-| 59 | D26 | D26 GPIO, I2S WS | PA[4] | &check; |
-| 68 | D5 | D5 GPIO, PWM, I2S TX | PB[19] | &check; |
-| 70 | D6 | D6 GPIO, PWM, I2S CLK | PB[20] | &check; |
-| 72 | D7 | D7 GPIO, PWM, I2S WS | PB[21] | |
+| 36 | TX / D9 | Serial TX, PWM, GPIO, SPI1 MOSI, I2S MCLK | PA[12] | Yes, but not typically needed |
+| 17 | D21 | D21 GPIO, I2S RX | PA[0] | Yes |
+| 19 | D20 | D20 GPIO, I2S TX | PA[1] | Yes |
+| 59 | D26 | D26 GPIO, I2S WS | PA[4] | Yes |
+| 68 | D5 | D5 GPIO, PWM, I2S TX | PB[19] | Available but non-standard |
+| 70 | D6 | D6 GPIO, PWM, I2S CLK | PB[20] | Yes |
+| 72 | D7 | D7 GPIO, PWM, I2S WS | PB[21] | No |
 
 
 The M-SoM supports PDM (DMIC) on the following pins:
@@ -83,8 +86,8 @@ The following pins are used for I2S.
 | 38 | D21 | D21 GPIO, I2S RX | 17 | PA[0] | GPIO20 (PCM_DIN) |
 | 40 | D20 | D20 GPIO, I2S TX | 19 | PA[1] | GPIO21 (PCM_DOUT) |
 
-
 The Muon is only compatible with Raspberry Pi expansion cards that support I2S on the PCM pins, not cards that use raw PCM frames.
+
 
 
 These are non-standard pins for I2S for the Raspberry Pi 40-pin HAT connector, though the RTL8722DM does support these as alternate pins for I2s:

@@ -1,5 +1,6 @@
 #include "Particle.h"
 
+#include "I2SGen4_RK.h"
 #include "rtl_i2s.h"
 #include "SparkFun_WM8960_Arduino_Library.h"
 

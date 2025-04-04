@@ -1,58 +1,41 @@
+#include "rtl_i2s.h"
+
 // The I2S API headers conflict with Particle.h headers!
 // This file can only contain interface code to the RTL SDK and not anything that interfaces
 // to the Particle platform.
 #include "i2s_api.h" 
 // #include "alc5651.h"
 
+
+rtl_i2s_api g_rtl_i2s_api = {
+	16000, // sampleRateHz
+	TRUE, // stereo
+	FALSE, // bits24
+	I2S_DIR_TXRX, // direction (2)
+	FALSE, // use_mclk 
+	35, // platform PLATFORM_P2 (32) or PLATFORM_MSOM (35)
+	NULL, // fillCallback
+	NULL, // receiveCallback
+};
+
+
 i2s_t i2s_obj;
 
-#define I2S_DMA_PAGE_SIZE	768   // 2 ~ 4096
-#define I2S_DMA_PAGE_NUM    4   // Vaild number is 2~4
 
-u8 i2s_tx_buf[I2S_DMA_PAGE_SIZE*I2S_DMA_PAGE_NUM];
-u8 i2s_rx_buf[I2S_DMA_PAGE_SIZE*I2S_DMA_PAGE_NUM];
+//The size of this buffer should be multiples of 32 and its head address should align to 32 
+//to prevent problems that may occur when CPU and DMA access this area simultaneously. 
+// I wonder if this needs to be SRAM_NOCACHE_DATA_SECTION? It is in some examples, but I get an overflow when I use it:
+// /Users/rickk/.particle/toolchains/gcc-arm/10.2.1/bin/../lib/gcc/arm-none-eabi/10.2.1/../../../../arm-none-eabi/bin/ld: /Users/rickk/Documents/src/Mine/I2SGen4_RK/target/6.3.0/msom/I2SGen4_RK_fi.elf section `.bdsram.data' will not fit in region `SRAM'
+// /Users/rickk/.particle/toolchains/gcc-arm/10.2.1/bin/../lib/gcc/arm-none-eabi/10.2.1/../../../../arm-none-eabi/bin/ld: section .backup VMA [000000001007b400,000000001007b403] overlaps section .bdsram.data VMA [000000001007ad40,000000001007b53f]
+// /Users/rickk/.particle/toolchains/gcc-arm/10.2.1/bin/../lib/gcc/arm-none-eabi/10.2.1/../../../../arm-none-eabi/bin/ld: region `SRAM' overflowed by 2064 bytes
+static u8 i2s_tx_buf[RTL_I2S_DMA_PAGE_SIZE*RTL_I2S_DMA_PAGE_COUNT]__attribute__((aligned(32)));
+static u8 i2s_rx_buf[RTL_I2S_DMA_PAGE_SIZE*RTL_I2S_DMA_PAGE_COUNT]__attribute__((aligned(32)));
 
 // #define SAMPLE_FILE
 #define SAMPLE_FILE_RATE 8000//44100
 #define SAMPLE_FILE_CHNUM 2
 
-/* QFN48 Pinmux
-// S0
-#define I2S_SCLK_PIN		PB_20
-#define I2S_WS_PIN		PB_21
-#define I2S_SD_TX_PIN		PB_19
-#define I2S_SD_RX_PIN	PB_22
-#define I2S_MCK_PIN		PA_12
-// S1
-#define I2S_SCLK_PIN		PB_20
-#define I2S_WS_PIN		PB_21
-#define I2S_SD_TX_PIN		PB_19
-#define I2S_SD_RX_PIN	PB_22
-#define I2S_MCK_PIN		PB_23
-*/
 
-/* QFN68 Pinmux */  
-// S0
-/*
-#define I2S_SCLK_PIN			PA_2
-#define I2S_WS_PIN			PA_4
-#define I2S_SD_TX_PIN			PB_26
-#define I2S_SD_RX_PIN		PA_0
-#define I2S_MCK_PIN			PA_12
-// S1
-#define I2S_SCLK_PIN			PB_29
-#define I2S_WS_PIN			PB_31
-#define I2S_SD_TX_PIN			PB_26
-#define I2S_SD_RX_PIN		PB_22
-#define I2S_MCK_PIN			PB_23
-*/
-
-// Muon/M-SoM
-#define I2S_SCLK_PIN			PB_20
-#define I2S_WS_PIN			PA_4
-#define I2S_SD_TX_PIN			PA_1
-#define I2S_SD_RX_PIN		PA_0
-#define I2S_MCK_PIN			NC
 
 
 #if defined(SAMPLE_FILE)
@@ -170,13 +153,6 @@ void gen_sound_sample24(int *buf, int buf_size, int channel_num)
     }
 }
 
-#if 0
-void test_delay(int sec)
-{
-	for(int i=0;i<166*1000*100*sec;i++)
-		asm(" nop");
-}
-#endif
 
 int test_rate_list[19] = {
 	SR_8KHZ,
@@ -207,21 +183,24 @@ void test_tx_complete(void *data, char *pbuf)
     
     i2s_t *obj = (i2s_t *)data;
 
+	// int* i2s_get_tx_page(i2s_t *obj);
     ptx_buf = i2s_get_tx_page(obj);
     //ptx_buf = (int*)pbuf;
 #if defined(SAMPLE_FILE)	
-    _memcpy((void*)ptx_buf, (void*)&sample[curr_cnt], I2S_DMA_PAGE_SIZE);
-	curr_cnt+=(I2S_DMA_PAGE_SIZE/sizeof(short));
+    _memcpy((void*)ptx_buf, (void*)&sample[curr_cnt], RTL_I2S_DMA_PAGE_SIZE);
+	curr_cnt+=(RTL_I2S_DMA_PAGE_SIZE/sizeof(short));
 	if(curr_cnt >= sample_size*(obj->channel_num==CH_MONO?1:2)) {
 		curr_cnt = 0;
     }
 #else
 	if(obj->word_length == WL_16b){
-		gen_sound_sample16((short*)ptx_buf, I2S_DMA_PAGE_SIZE/sizeof(short), obj->channel_num==CH_MONO?1:2);
+		gen_sound_sample16((short*)ptx_buf, RTL_I2S_DMA_PAGE_SIZE/sizeof(short), obj->channel_num==CH_MONO?1:2);
 	}else{
-		gen_sound_sample24((int*)ptx_buf, I2S_DMA_PAGE_SIZE/sizeof(int), obj->channel_num==CH_MONO?1:2);
+		gen_sound_sample24((int*)ptx_buf, RTL_I2S_DMA_PAGE_SIZE/sizeof(int), obj->channel_num==CH_MONO?1:2);
 	}
 #endif
+
+	// void i2s_send_page(i2s_t *obj, uint32_t *pbuf);
     i2s_send_page(obj, (uint32_t*)ptx_buf);
 }
 
@@ -231,7 +210,9 @@ void test_rx_complete(void *data, char* pbuf)
     int *ptx_buf;
 
     //ptx_buf = i2s_get_tx_page(obj);
-    //_memcpy((void*)ptx_buf, (void*)pbuf, I2S_DMA_PAGE_SIZE);
+    //_memcpy((void*)ptx_buf, (void*)pbuf, RTL_I2S_DMA_PAGE_SIZE);
+
+	// void i2s_recv_page(i2s_t *obj);
     i2s_recv_page(obj);    // submit a new page for receive
     //i2s_send_page(obj, (uint32_t*)ptx_buf);    // loopback
 }
@@ -240,6 +221,7 @@ void runTest(void)
 {
     int *ptx_buf;
     int i,j;
+	PinName sckPin, wsPin, txPin, rxPin, mckPin;
     
 	// alc5651_init();
 	// alc5651_init_interface2();	// connect to ALC interface 2
@@ -249,24 +231,74 @@ void runTest(void)
 	//alc5651_index_dump();
 
 	// I2S init
-	i2s_obj.channel_num = CH_MONO;//CH_STEREO;
+
+	// Valid values: CH_MONO, CH_STEREO
+	i2s_obj.channel_num = CH_MONO;
+
+	// Valid values: SR_8KHZ, SR_16KHZ, SR_24KHZ, SR_32KHZ, SR_48KHZ, SR_96KHZ, SR_7p35KHZ, SR_14p7KHZ, SR_22p05KHZ, SR_29p4KHZ, SR_44p1KHZ, SR_88p2KHZ
 	i2s_obj.sampling_rate = SR_44p1KHZ;
+
+	// Valid values: WL_16b, WL_24b
 	i2s_obj.word_length = WL_16b;
-	i2s_obj.direction = I2S_DIR_TXRX;    
-	i2s_init(&i2s_obj, I2S_SCLK_PIN, I2S_WS_PIN, I2S_SD_TX_PIN, I2S_SD_RX_PIN, I2S_MCK_PIN);
+
+	// Valid directions:
+	// I2S_DIR_RX (0), I2S_DIR_TX (1), I2S_DIR_TXRX (2)
+	i2s_obj.direction = g_rtl_i2s_api.direction;    
+
+	if (g_rtl_i2s_api.platform == 32) {
+		// PLATFORM_P2 (32)
+
+		// P2 only (these are not exposed on Photon 2)
+		sckPin = PB_29;
+		wsPin = PB_31;
+		txPin = PB_26;
+		rxPin = PA_0;
+		mckPin = PA_12;
+	}
+	else {
+		// PLATFORM_MSOM (35)
+		sckPin = PB_20;
+		wsPin = PA_4;
+		txPin = PA_1;
+		rxPin = PA_0;
+		mckPin = PA_12;
+	}
+
+	if (g_rtl_i2s_api.direction == I2S_DIR_TX) {
+		// TX only
+		rxPin = NC;
+	}
+	if (g_rtl_i2s_api.direction == I2S_DIR_RX) {
+		// RX only
+		txPin = NC;
+	}
+	if (!g_rtl_i2s_api.use_mclk) {
+		mckPin = NC;
+	}
+
+
+	// void i2s_init(i2s_t *obj, PinName sck, PinName ws, PinName sd_tx, PinName sd_rx, PinName mck);
+	// PinName is an enum of constants like PA_0
+	i2s_init(&i2s_obj, sckPin, wsPin, txPin, rxPin, mckPin);
+
+	// void i2s_set_dma_buffer(i2s_t *obj, char *tx_buf, char *rx_buf, uint32_t page_num, uint32_t page_size);
     i2s_set_dma_buffer(&i2s_obj, (char*)i2s_tx_buf, (char*)i2s_rx_buf, \
-        I2S_DMA_PAGE_NUM, I2S_DMA_PAGE_SIZE);
+        RTL_I2S_DMA_PAGE_COUNT, RTL_I2S_DMA_PAGE_SIZE);
+
+	// void i2s_tx_irq_handler(i2s_t *obj, i2s_irq_handler handler, uint32_t id);
     i2s_tx_irq_handler(&i2s_obj, (i2s_irq_handler)test_tx_complete, (uint32_t)&i2s_obj);
+
+	// void i2s_rx_irq_handler(i2s_t *obj, i2s_irq_handler handler, uint32_t id);
     i2s_rx_irq_handler(&i2s_obj, (i2s_irq_handler)test_rx_complete, (uint32_t)&i2s_obj);
     
 #if defined(SAMPLE_FILE)	
 	i2s_set_param(&i2s_obj,SAMPLE_FILE_CHNUM,SAMPLE_FILE_RATE,WL_16b);
-    for (i=0;i<I2S_DMA_PAGE_NUM;i++) {
+    for (i=0;i<RTL_I2S_DMA_PAGE_COUNT;i++) {
         ptx_buf = i2s_get_tx_page(&i2s_obj);
         if (ptx_buf) {
-            _memcpy((void*)ptx_buf, (void*)&sample[curr_cnt], I2S_DMA_PAGE_SIZE);
+            _memcpy((void*)ptx_buf, (void*)&sample[curr_cnt], RTL_I2S_DMA_PAGE_SIZE);
             i2s_send_page(&i2s_obj, (uint32_t*)ptx_buf);
-            curr_cnt+=(I2S_DMA_PAGE_SIZE/sizeof(short));
+            curr_cnt+=(RTL_I2S_DMA_PAGE_SIZE/sizeof(short));
             if(curr_cnt >= sample_size*(i2s_obj.channel_num==CH_MONO?1:2)) {
                 curr_cnt = 0;
             }
@@ -290,10 +322,10 @@ void runTest(void)
 	for(i=0;i<19;i++){
 		i2s_set_param(&i2s_obj,CH_STEREO,test_rate_list[i],WL_16b);
         // Start with fill all pages of DMA buffer
-        for (j=0;j<I2S_DMA_PAGE_NUM;j++) {
+        for (j=0;j<RTL_I2S_DMA_PAGE_COUNT;j++) {
             ptx_buf = i2s_get_tx_page(&i2s_obj);
             if (ptx_buf) {
-                gen_sound_sample16((short*)ptx_buf, I2S_DMA_PAGE_SIZE/sizeof(short), 2);
+                gen_sound_sample16((short*)ptx_buf, RTL_I2S_DMA_PAGE_SIZE/sizeof(short), 2);
                 i2s_send_page(&i2s_obj, (uint32_t*)ptx_buf);
             }
         }
@@ -303,10 +335,10 @@ void runTest(void)
 	// Mono, 16bit
 	for(i=0;i<19;i++){
 		i2s_set_param(&i2s_obj,CH_MONO,test_rate_list[i],WL_16b);
-        for (j=0;j<I2S_DMA_PAGE_NUM;j++) {
+        for (j=0;j<RTL_I2S_DMA_PAGE_COUNT;j++) {
             ptx_buf = i2s_get_tx_page(&i2s_obj);
             if (ptx_buf) {
-                gen_sound_sample16((short*)ptx_buf, I2S_DMA_PAGE_SIZE/sizeof(short), 1);
+                gen_sound_sample16((short*)ptx_buf, RTL_I2S_DMA_PAGE_SIZE/sizeof(short), 1);
                 i2s_send_page(&i2s_obj, (uint32_t*)ptx_buf);
             }
         }
@@ -323,10 +355,10 @@ void runTest(void)
 	// Stereo, 24bit
 	for(i=0;i<19;i++){
 		i2s_set_param(&i2s_obj,CH_STEREO,test_rate_list[i],WL_24b);
-        for (j=0;j<I2S_DMA_PAGE_NUM;j++) {
+        for (j=0;j<RTL_I2S_DMA_PAGE_COUNT;j++) {
             ptx_buf = i2s_get_tx_page(&i2s_obj);
             if (ptx_buf) {
-                gen_sound_sample24((int*)ptx_buf, I2S_DMA_PAGE_SIZE/sizeof(int), 2);
+                gen_sound_sample24((int*)ptx_buf, RTL_I2S_DMA_PAGE_SIZE/sizeof(int), 2);
                 i2s_send_page(&i2s_obj, (uint32_t*)ptx_buf);
             }
         }
@@ -339,4 +371,34 @@ void runTest(void)
 	
 	
 	// while(1);
+}
+
+
+int rtl_i2s_mapSampleRate(int rateHz) {
+	switch(rateHz) {
+		case 8000:
+			return SR_8KHZ;
+
+		case 16000:
+			return SR_16KHZ;
+		
+		case 24000:
+			return SR_24KHZ;
+
+		case 32000:
+			return SR_32KHZ;
+
+		case 48000:
+			return SR_48KHZ;
+
+		case 96000:
+			return SR_96KHZ;
+
+		case 44100:
+			return SR_44p1KHZ;			
+
+		default:
+			return -1;
+	}
+
 }
