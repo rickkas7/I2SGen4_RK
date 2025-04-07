@@ -8,7 +8,7 @@ extern "C" {
 #define RTL_I2S_DMA_PAGE_SIZE	768   // 2 ~ 4096
 #define RTL_I2S_DMA_PAGE_COUNT    4   // Vaild number is 2~4
 
-typedef int (*rtl_i2s_callback)(void *buf, int bufSize);
+typedef void (*rtl_i2s_callback)(void *buf);
 
 
 typedef struct {
@@ -61,12 +61,16 @@ typedef struct {
     /**
      * @brief Function to initialize with the current settings
      */
-    int (*init)();
+    void (*init)();
 
     /**
      * @brief Function to deinitialize
      */
-    int (*deinit)();
+    void (*deinit)();
+
+    void (*sendPage)(void *buf);
+
+    void (*returnRecvPage)();
 
 } rtl_i2s_api;
 

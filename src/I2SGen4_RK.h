@@ -137,15 +137,17 @@ public:
     
 
     /**
-     * @brief Set the function to fill
+     * @brief Set function that is called to fill a buffer with I2S samples to send
      * 
      * @param fillCallback 
      * @return I2SGen4_RK& 
+     * 
+     * This function is called 
      */
-    I2SGen4_RK &withFillCallback(std::function<int(void *buf, int bufSize)> fillCallback) { this->fillCallback = fillCallback; return *this; };
+    I2SGen4_RK &withFillCallback(std::function<void(void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t numChannels)> fillCallback, bool runAsISR);
 
 
-    I2SGen4_RK &withReceiveCallback(std::function<int(void *buf, int bufSize)> receiveCallback) { this->receiveCallback = fillCallback; return *this; };
+    I2SGen4_RK &withReceiveCallback(std::function<void(const void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t numChannels)> receiveCallback, bool runAsISR);
 
 
     /**
@@ -223,7 +225,11 @@ protected:
      * @param bufSize 
      * @return int 
      */
-    static int fillCallbackStatic(void *buf, int bufSize);
+    static void fillCallbackStatic(void *buf);
+
+    void fillCallback(void *buf);
+
+    void fillCallbackInternal(void *buf);
 
     /**
      * @brief Function that is called to process a buffer received
@@ -232,19 +238,26 @@ protected:
      * @param bufSize 
      * @return int 
      */
-    static int receiveCallbackStatic(void *buf, int bufSize);
+    static void receiveCallbackStatic(void *buf);
+
+    void receiveCallback(void *buf);
+
+    void receiveCallbackInternal(void *buf);
 
     /**
      * @brief User callback to fill a buffer to send
      */
-    std::function<int(void *buf, int bufSize)> fillCallback = 0;
+    std::function<void(void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t numChannels)> userFillCallback = 0;
+
+    bool userFillCallbackRunAsISR = true;
 
     /**
      * @brief User callback to process a buffer received
      * 
      */
-    std::function<int(void *buf, int bufSize)> receiveCallback = 0;
+    std::function<void(const void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t numChannels)> userReceiveCallback = 0;
 
+    bool userReceiveCallbackRunAsISR = false;
 
     /**
      * @brief Mutex to protect shared resources
@@ -259,6 +272,10 @@ protected:
      * This is initialized in setup() so make sure you call the setup() method from the global application setup.
      */
     Thread *thread = 0;
+
+    os_queue_t fillQueue;
+
+    os_queue_t receiveQueue;
 
     /**
      * @brief Singleton instance of this class

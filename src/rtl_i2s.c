@@ -7,8 +7,10 @@
 // #include "alc5651.h"
 
 
-static int rtl_i2s_init();
-static int rtl_i2s_deinit();
+static void rtl_i2s_init();
+static void rtl_i2s_deinit();
+static void rtl_i2s_sendPage(void *buf);
+static void rtl_i2s_returnRecvPage();
 
 
 rtl_i2s_api g_rtl_i2s_api = {
@@ -22,6 +24,8 @@ rtl_i2s_api g_rtl_i2s_api = {
 	NULL, // receiveCallback
 	rtl_i2s_init,
 	rtl_i2s_deinit,
+	rtl_i2s_sendPage,
+	rtl_i2s_returnRecvPage,
 };
 
 
@@ -46,24 +50,17 @@ void test_tx_complete(void *data, char *pbuf)
 	// int* i2s_get_tx_page(i2s_t *obj);
     ptx_buf = i2s_get_tx_page(obj);
 
-	if (g_rtl_i2s_api.fillCallback(ptx_buf, RTL_I2S_DMA_PAGE_SIZE) == 0) {
-		// void i2s_send_page(i2s_t *obj, uint32_t *pbuf);
-		i2s_send_page(obj, (uint32_t*)ptx_buf);
-
-	}
+	g_rtl_i2s_api.fillCallback(ptx_buf);
 }
 
 void test_rx_complete(void *data, char* pbuf)
 {
-    i2s_t *obj = (i2s_t *)data;
+    // i2s_t *obj = (i2s_t *)data;
 
-	g_rtl_i2s_api.receiveCallback(pbuf, RTL_I2S_DMA_PAGE_SIZE);
-
-	// void i2s_recv_page(i2s_t *obj);
-    i2s_recv_page(obj);    // submit a new page for receive
+	g_rtl_i2s_api.receiveCallback(pbuf);
 }
 
-int rtl_i2s_init() {
+void rtl_i2s_init() {
     int i;
 	PinName sckPin, wsPin, txPin, rxPin, mckPin;
     
@@ -130,12 +127,18 @@ int rtl_i2s_init() {
 		test_tx_complete(&i2s_obj, 0);
 	}
 
-
-	return 0;
 }
-int rtl_i2s_deinit() {
+void rtl_i2s_deinit() {
 	i2s_deinit(&i2s_obj);
-	return 0;
+}
+
+void rtl_i2s_sendPage(void *buf) {
+	i2s_send_page(&i2s_obj, (uint32_t *)buf);
+}
+
+void rtl_i2s_returnRecvPage() {
+	// void i2s_recv_page(i2s_t *obj);
+	i2s_recv_page(&i2s_obj);
 }
 
 

@@ -215,11 +215,9 @@ void runTest()
         .withStereo()
         .withDirection(I2SGen4_RK::Direction::TX_ONLY)
         .withBits16()
-        .withFillCallback([](void *buf, int bufSize) {
-            return 0;
-        })
-        .withReceiveCallback([](void *buf, int bufSize) {
-            return 0;
-        })
+        .withFillCallback([](void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t numChannels) {
+        }, true)
+        .withReceiveCallback([](const void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t numChannels) {
+        }, true)
         .setup();
 }
