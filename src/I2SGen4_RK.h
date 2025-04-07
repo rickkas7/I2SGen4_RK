@@ -144,10 +144,16 @@ public:
      * 
      * This function is called 
      */
-    I2SGen4_RK &withFillCallback(std::function<void(void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t numChannels)> fillCallback, bool runAsISR);
+    I2SGen4_RK &withFillCallback(std::function<void(void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t numChannels)> fillCallback) { userFillCallback = fillCallback; return *this; };
 
 
-    I2SGen4_RK &withReceiveCallback(std::function<void(const void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t numChannels)> receiveCallback, bool runAsISR);
+    I2SGen4_RK &withFillCallbackRunAsISR(bool runAsISR = true) { userFillCallbackRunAsISR = runAsISR; return *this; };
+
+
+    I2SGen4_RK &withReceiveCallback(std::function<void(const void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t numChannels)> receiveCallback) { userReceiveCallback = receiveCallback; return *this; };
+
+
+    I2SGen4_RK &withReceiveCallbackRunAsISR(bool runAsISR = true) { userReceiveCallbackRunAsISR = runAsISR; return *this; };
 
 
     /**
@@ -249,7 +255,7 @@ protected:
      */
     std::function<void(void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t numChannels)> userFillCallback = 0;
 
-    bool userFillCallbackRunAsISR = true;
+    bool userFillCallbackRunAsISR = false;
 
     /**
      * @brief User callback to process a buffer received

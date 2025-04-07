@@ -25,20 +25,6 @@ I2SGen4_RK::I2SGen4_RK() {
 I2SGen4_RK::~I2SGen4_RK() {
 }
 
-I2SGen4_RK &I2SGen4_RK::withFillCallback(std::function<void(void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t numChannels)> fillCallback, bool runAsISR) { 
-    userFillCallback = fillCallback; 
-    userFillCallbackRunAsISR = runAsISR;
-    return *this; 
-};
-
-
-I2SGen4_RK &I2SGen4_RK::withReceiveCallback(std::function<void(const void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t numChannels)> receiveCallback, bool runAsISR) { 
-    userReceiveCallback = receiveCallback; 
-    userReceiveCallbackRunAsISR = runAsISR;
-    return *this; 
-};
-
-
 void I2SGen4_RK::setup() {
     os_mutex_create(&mutex);
 
