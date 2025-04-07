@@ -55,6 +55,8 @@ public:
      * @brief Sets mono (monophonic, single channel) mode. Default is stereo.
      * 
      * @return I2SGen4_RK& 
+     * 
+     * Note: Mono 24-bit mode is not supported by the hardware!
      */
     I2SGen4_RK &withMono() { g_rtl_i2s_api.stereo = false; return *this; };
 
@@ -133,6 +135,19 @@ public:
      */
     int getDmaPageCount() const { return RTL_I2S_DMA_PAGE_COUNT; };
     
+
+    /**
+     * @brief Set the function to fill
+     * 
+     * @param fillCallback 
+     * @return I2SGen4_RK& 
+     */
+    I2SGen4_RK &withFillCallback(std::function<int(void *buf, int bufSize)> fillCallback) { this->fillCallback = fillCallback; return *this; };
+
+
+    I2SGen4_RK &withReceiveCallback(std::function<int(void *buf, int bufSize)> receiveCallback) { this->receiveCallback = fillCallback; return *this; };
+
+
     /**
      * @brief Perform setup operations; call this from global application setup()
      * 
@@ -202,6 +217,36 @@ protected:
     os_thread_return_t threadFunction(void);
 
     /**
+     * @brief Function that is called to fill the buffer to send
+     * 
+     * @param buf 
+     * @param bufSize 
+     * @return int 
+     */
+    static int fillCallbackStatic(void *buf, int bufSize);
+
+    /**
+     * @brief Function that is called to process a buffer received
+     * 
+     * @param buf 
+     * @param bufSize 
+     * @return int 
+     */
+    static int receiveCallbackStatic(void *buf, int bufSize);
+
+    /**
+     * @brief User callback to fill a buffer to send
+     */
+    std::function<int(void *buf, int bufSize)> fillCallback = 0;
+
+    /**
+     * @brief User callback to process a buffer received
+     * 
+     */
+    std::function<int(void *buf, int bufSize)> receiveCallback = 0;
+
+
+    /**
      * @brief Mutex to protect shared resources
      * 
      * This is initialized in setup() so make sure you call the setup() method from the global application setup.
@@ -223,4 +268,18 @@ protected:
     static I2SGen4_RK *_instance;
 
 };
+
+
+/**
+ * @brief Testing functions
+ */
+class I2SGen4_Test_RK {
+public:
+    static void generateSample16(int16_t *buf, size_t sampleCount, size_t channelCount);
+    static void generateSample24(int *buf, size_t sampleCount, size_t channelCount);
+
+    static const int16_t sine16[]; // 16 elements
+    static const int32_t sine24[]; // 16 elements
+};
+    
 #endif  /* __I2SGEN4_RK_H */

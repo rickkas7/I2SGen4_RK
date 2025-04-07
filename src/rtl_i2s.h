@@ -58,6 +58,16 @@ typedef struct {
     rtl_i2s_callback receiveCallback;
 
 
+    /**
+     * @brief Function to initialize with the current settings
+     */
+    int (*init)();
+
+    /**
+     * @brief Function to deinitialize
+     */
+    int (*deinit)();
+
 } rtl_i2s_api;
 
 extern rtl_i2s_api g_rtl_i2s_api;

@@ -15,11 +15,12 @@ SerialLogHandler logHandler(LOG_LEVEL_INFO);
 
 WM8960 codec;
 
+void runTest();
+
 void setup()
 {
     waitFor(Serial.isConnected, 10000);
     delay(2000);
-    
 
     Wire.begin();
 
@@ -45,14 +46,14 @@ void setup()
 
         // Set gainstage between booster mixer and output mixer
         // For this loopback example, we are going to keep these as low as they go
-        codec.setLB2LOVOL(WM8960_OUTPUT_MIXER_GAIN_NEG_21DB); 
+        codec.setLB2LOVOL(WM8960_OUTPUT_MIXER_GAIN_NEG_21DB);
         codec.setRB2ROVOL(WM8960_OUTPUT_MIXER_GAIN_NEG_21DB);
 
         // Enable output mixers
         codec.enableLOMIX();
         codec.enableROMIX();
 
-        // CLOCK STUFF, These settings will get you 44.1KHz sample rate, and class-d 
+        // CLOCK STUFF, These settings will get you 44.1KHz sample rate, and class-d
         // freq at 705.6kHz
         codec.enablePLL(); // Needed for class-d amp clock
         codec.setPLLPRESCALE(WM8960_PLLPRESCALE_DIV_2);
@@ -63,23 +64,23 @@ void setup()
         codec.setDCLKDIV(WM8960_DCLKDIV_16);
         codec.setPLLN(7);
         codec.setPLLK(0x86, 0xC2, 0x26); // PLLK=86C226h
-        //codec.setADCDIV(0); // Default is 000 (what we need for 44.1KHz)
-        //codec.setDACDIV(0); // Default is 000 (what we need for 44.1KHz)
+        // codec.setADCDIV(0); // Default is 000 (what we need for 44.1KHz)
+        // codec.setDACDIV(0); // Default is 000 (what we need for 44.1KHz)
         codec.setWL(WM8960_WL_16BIT);
 
         codec.enablePeripheralMode();
-        //codec.enableMasterMode();
-        //codec.setALRCGPIO(); // Note, should not be changed while ADC is enabled.
+        // codec.enableMasterMode();
+        // codec.setALRCGPIO(); // Note, should not be changed while ADC is enabled.
 
         // Enable DACs
         codec.enableDacLeft();
         codec.enableDacRight();
 
-        //codec.enableLoopBack(); // Loopback sends ADC data directly into DAC
+        // codec.enableLoopBack(); // Loopback sends ADC data directly into DAC
         codec.disableLoopBack();
 
         // Default is "soft mute" on, so we must disable mute to make channels active
-        codec.disableDacMute(); 
+        codec.disableDacMute();
 
         // Volume 0 = 0dB, more negative is lower volume, lowest is -74.00 dB
         codec.enableSpeakers();
@@ -193,22 +194,32 @@ void setup()
         codec.enableSpeakers();
         codec.setSpeakerVolumeDB(0.00);
 #endif
-
     }
     else
     {
         Log.error("The device did not respond. Please check wiring.");
     }
 
-    runTest();
+    // runTest();
 }
 
 void loop()
 {
+    I2SGen4_RK::instance().loop();
 }
 
-// Used from rtl_i2s.c
-extern "C"
-void wait_ms(long ms) {
-    delay(ms);
+void runTest()
+{
+    I2SGen4_RK::instance()
+        .withSampleRate(16000)
+        .withStereo()
+        .withDirection(I2SGen4_RK::Direction::TX_ONLY)
+        .withBits16()
+        .withFillCallback([](void *buf, int bufSize) {
+            return 0;
+        })
+        .withReceiveCallback([](void *buf, int bufSize) {
+            return 0;
+        })
+        .setup();
 }
