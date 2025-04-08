@@ -49,13 +49,13 @@ typedef struct {
      * @brief Callback to fill a buffer to transmit
      * 
      */
-    rtl_i2s_callback fillCallback;
+    void (*fillCallback)();
     
     /**
      * @brief Callback to process a received buffer
      * 
      */
-    rtl_i2s_callback receiveCallback;
+    void (*receiveCallback)(void *buf);
 
 
     /**
@@ -68,7 +68,9 @@ typedef struct {
      */
     void (*deinit)();
 
-    void (*sendPage)(void *buf);
+    void * (*getTxPage)();
+
+    void (*sendTxPage)(void *buf);
 
     void (*returnRecvPage)();
 

@@ -9,7 +9,8 @@
 
 static void rtl_i2s_init();
 static void rtl_i2s_deinit();
-static void rtl_i2s_sendPage(void *buf);
+static void *rtl_i2s_getTxPage();
+static void rtl_i2s_sendTxPage(void *buf);
 static void rtl_i2s_returnRecvPage();
 
 
@@ -24,7 +25,8 @@ rtl_i2s_api g_rtl_i2s_api = {
 	NULL, // receiveCallback
 	rtl_i2s_init,
 	rtl_i2s_deinit,
-	rtl_i2s_sendPage,
+	rtl_i2s_getTxPage,
+	rtl_i2s_sendTxPage,
 	rtl_i2s_returnRecvPage,
 };
 
@@ -44,13 +46,7 @@ static u8 i2s_rx_buf[RTL_I2S_DMA_PAGE_SIZE*RTL_I2S_DMA_PAGE_COUNT]__attribute__(
 
 static void rtl_i2s_fill_buffer(void *data, char *pbuf)
 {
-    int *ptx_buf;    
-    i2s_t *obj = (i2s_t *)data;
-
-	// int* i2s_get_tx_page(i2s_t *obj);
-    ptx_buf = i2s_get_tx_page(obj);
-
-	g_rtl_i2s_api.fillCallback(ptx_buf);
+	g_rtl_i2s_api.fillCallback();
 }
 
 static void rtl_i2s_receive_buffer(void *data, char* pbuf)
@@ -124,7 +120,7 @@ void rtl_i2s_init() {
     i2s_rx_irq_handler(&i2s_obj, (i2s_irq_handler)rtl_i2s_receive_buffer, (uint32_t)&i2s_obj);
     
     for (i=0;i<RTL_I2S_DMA_PAGE_COUNT;i++) {
-		rtl_i2s_fill_buffer(&i2s_obj, 0);
+		g_rtl_i2s_api.fillCallback();
 	}
 
 }
@@ -132,7 +128,12 @@ void rtl_i2s_deinit() {
 	i2s_deinit(&i2s_obj);
 }
 
-void rtl_i2s_sendPage(void *buf) {
+void *rtl_i2s_getTxPage() {
+	// int* i2s_get_tx_page(i2s_t *obj);
+    return (void *) i2s_get_tx_page(&i2s_obj);
+}
+
+void rtl_i2s_sendTxPage(void *buf) {
 	i2s_send_page(&i2s_obj, (uint32_t *)buf);
 }
 

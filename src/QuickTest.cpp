@@ -82,7 +82,7 @@ void setup()
 
         // Volume 0 = 0dB, more negative is lower volume, lowest is -74.00 dB
         codec.enableSpeakers();
-        codec.setSpeakerVolumeDB(-10.00);
+        codec.setSpeakerVolumeDB(-20.00);
 #endif
 
 #if 0
@@ -206,7 +206,7 @@ void setup()
         .withFillCallback([](void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount) {
             I2SGen4_Test_RK::generateSample16((int16_t*)buf, sampleCount, channelCount);
         })
-//        .withFillCallbackRunAsISR()
+        .withFillCallbackRunAsISR()
         .withReceiveCallback([](const void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount) {
         })
         .setup();

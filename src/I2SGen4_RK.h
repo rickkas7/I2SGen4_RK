@@ -278,11 +278,11 @@ protected:
      * @param bufSize 
      * @return int 
      */
-    static void fillCallbackStatic(void *buf);
+    static void fillCallbackStatic();
 
-    void fillCallback(void *buf);
+    void fillCallback();
 
-    void fillCallbackInternal(void *buf);
+    void fillCallbackInternal();
 
     /**
      * @brief Function that is called to process a buffer received
