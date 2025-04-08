@@ -42,7 +42,7 @@ static u8 i2s_tx_buf[RTL_I2S_DMA_PAGE_SIZE*RTL_I2S_DMA_PAGE_COUNT]__attribute__(
 static u8 i2s_rx_buf[RTL_I2S_DMA_PAGE_SIZE*RTL_I2S_DMA_PAGE_COUNT]__attribute__((aligned(32)));
 
 
-void test_tx_complete(void *data, char *pbuf)
+static void rtl_i2s_fill_buffer(void *data, char *pbuf)
 {
     int *ptx_buf;    
     i2s_t *obj = (i2s_t *)data;
@@ -53,7 +53,7 @@ void test_tx_complete(void *data, char *pbuf)
 	g_rtl_i2s_api.fillCallback(ptx_buf);
 }
 
-void test_rx_complete(void *data, char* pbuf)
+static void rtl_i2s_receive_buffer(void *data, char* pbuf)
 {
     // i2s_t *obj = (i2s_t *)data;
 
@@ -118,13 +118,13 @@ void rtl_i2s_init() {
         RTL_I2S_DMA_PAGE_COUNT, RTL_I2S_DMA_PAGE_SIZE);
 
 	// void i2s_tx_irq_handler(i2s_t *obj, i2s_irq_handler handler, uint32_t id);
-    i2s_tx_irq_handler(&i2s_obj, (i2s_irq_handler)test_tx_complete, (uint32_t)&i2s_obj);
+    i2s_tx_irq_handler(&i2s_obj, (i2s_irq_handler)rtl_i2s_fill_buffer, (uint32_t)&i2s_obj);
 
 	// void i2s_rx_irq_handler(i2s_t *obj, i2s_irq_handler handler, uint32_t id);
-    i2s_rx_irq_handler(&i2s_obj, (i2s_irq_handler)test_rx_complete, (uint32_t)&i2s_obj);
+    i2s_rx_irq_handler(&i2s_obj, (i2s_irq_handler)rtl_i2s_receive_buffer, (uint32_t)&i2s_obj);
     
     for (i=0;i<RTL_I2S_DMA_PAGE_COUNT;i++) {
-		test_tx_complete(&i2s_obj, 0);
+		rtl_i2s_fill_buffer(&i2s_obj, 0);
 	}
 
 }

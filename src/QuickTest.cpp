@@ -15,8 +15,6 @@ SerialLogHandler logHandler(LOG_LEVEL_INFO);
 
 WM8960 codec;
 
-void runTest();
-
 void setup()
 {
     waitFor(Serial.isConnected, 10000);
@@ -200,24 +198,23 @@ void setup()
         Log.error("The device did not respond. Please check wiring.");
     }
 
-    // runTest();
-}
-
-void loop()
-{
-    I2SGen4_RK::instance().loop();
-}
-
-void runTest()
-{
     I2SGen4_RK::instance()
         .withSampleRate(16000)
         .withStereo()
         .withDirection(I2SGen4_RK::Direction::TX_ONLY)
         .withBits16()
-        .withFillCallback([](void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t numChannels) {
+        .withFillCallback([](void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount) {
+            I2SGen4_Test_RK::generateSample16((int16_t*)buf, sampleCount, channelCount);
         })
-        .withReceiveCallback([](const void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t numChannels) {
+//        .withFillCallbackRunAsISR()
+        .withReceiveCallback([](const void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount) {
         })
         .setup();
+
+    I2SGen4_RK::instance().start();
+}
+
+void loop()
+{
+    I2SGen4_RK::instance().loop();
 }

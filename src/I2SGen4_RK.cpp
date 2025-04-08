@@ -31,33 +31,37 @@ void I2SGen4_RK::setup() {
     os_queue_create(&fillQueue, sizeof(void*), RTL_I2S_DMA_PAGE_COUNT, 0);
     os_queue_create(&receiveQueue, sizeof(void*), RTL_I2S_DMA_PAGE_COUNT, 0);
 
-    thread = new Thread("I2S", [this]() { return threadFunction(); }, OS_THREAD_PRIORITY_DEFAULT, 3072);
+    fillThread = new Thread("I2S fill", [this]() { return fillThreadFunction(); }, OS_THREAD_PRIORITY_DEFAULT, 3072);
+    receiveThread = new Thread("I2S receive", [this]() { return receiveThreadFunction(); }, OS_THREAD_PRIORITY_DEFAULT, 3072);
 }
 
 void I2SGen4_RK::loop() {
     // Put your code to run during the application thread loop here
 }
 
-os_thread_return_t I2SGen4_RK::threadFunction(void) {
+os_thread_return_t I2SGen4_RK::fillThreadFunction(void) {
     while(true) {
         int err;
         void *buf;
 
-        err = os_queue_take(fillQueue, &buf, 0, 0);
+        err = os_queue_take(fillQueue, &buf, 1000, 0);
         if (err == 0) {
-            fillCallback(buf);
+            fillCallbackInternal(buf);
         }
-
-        err = os_queue_take(receiveQueue, &buf, 0, 0);
-        if (err == 0) {
-            receiveCallback(buf);
-        }
-
-        // Put your code to run in the worker thread here
-        delay(1);
     }
 }
 
+os_thread_return_t I2SGen4_RK::receiveThreadFunction(void) {
+    while(true) {
+        int err;
+        void *buf;
+
+        err = os_queue_take(receiveQueue, &buf, 1000, 0);
+        if (err == 0) {
+            receiveCallbackInternal(buf);
+        }
+    }
+}
 // [static]
 void I2SGen4_RK::fillCallbackStatic(void *buf) {
     if (_instance) {
@@ -79,10 +83,10 @@ void I2SGen4_RK::fillCallback(void *buf) {
 void I2SGen4_RK::fillCallbackInternal(void *buf) {
     if (userFillCallback) {
         size_t bytesPerSample = g_rtl_i2s_api.bits24 ? 4 : 2;
-        size_t numChannels = g_rtl_i2s_api.stereo ? 2 : 1;
-        size_t sampleCount = getDmaPageSize() / bytesPerSample / numChannels;
+        size_t channelCount = g_rtl_i2s_api.stereo ? 2 : 1;
+        size_t sampleCount = getDmaPageSize() / bytesPerSample / channelCount;
         
-        userFillCallback(buf, getDmaPageSize(), sampleCount, bytesPerSample, numChannels);
+        userFillCallback(buf, getDmaPageSize(), sampleCount, bytesPerSample, channelCount);
     } 
     else {
         memset(buf, 0, getDmaPageSize());
@@ -112,10 +116,10 @@ void I2SGen4_RK::receiveCallback(void *buf) {
 void I2SGen4_RK::receiveCallbackInternal(void *buf) {
     if (userReceiveCallback) {
         size_t bytesPerSample = g_rtl_i2s_api.bits24 ? 4 : 2;
-        size_t numChannels = g_rtl_i2s_api.stereo ? 2 : 1;
-        size_t sampleCount = getDmaPageSize() / bytesPerSample / numChannels;
+        size_t channelCount = g_rtl_i2s_api.stereo ? 2 : 1;
+        size_t sampleCount = getDmaPageSize() / bytesPerSample / channelCount;
 
-        userReceiveCallback(buf, getDmaPageSize(), sampleCount, bytesPerSample, numChannels);
+        userReceiveCallback(buf, getDmaPageSize(), sampleCount, bytesPerSample, channelCount);
     }
 
     g_rtl_i2s_api.returnRecvPage();

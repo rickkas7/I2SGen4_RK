@@ -142,19 +142,60 @@ public:
      * @param fillCallback 
      * @return I2SGen4_RK& 
      * 
-     * This function is called 
+     * The fill callback or lambda has the prototype:
+     * 
+     * void callback(const void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount)
+     * 
+     * - buf The buffer where the data is stored.
+     * - bufSize The size of the buffer in bytes. This is getDmaPageSize().
+     * - sampleCount The number of samples in the buffer, taking into account the size in bits (16 or 24) and the number of channels (1 or 2, mono or stereo).
+     * - bytesPerSample 2 for 16-bit, or 4 for 24-bit, For 24 bit, samples are aligned on the LSB side (mask 0x00ffffff).
+     * - channelCount 1 for mono or 2 for stereo.
      */
-    I2SGen4_RK &withFillCallback(std::function<void(void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t numChannels)> fillCallback) { userFillCallback = fillCallback; return *this; };
+    I2SGen4_RK &withFillCallback(std::function<void(void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount)> fillCallback) { userFillCallback = fillCallback; return *this; };
 
 
+    /**
+     * @brief Set the fill callback to run at interrupt (ISR) level
+     * 
+     * @param runAsISR 
+     * @return I2SGen4_RK& 
+     * 
+     * By default, the fill callback runs from a thread. By using this call, you can run the callback at the ISR level, which has lower
+     * latency, but more restrictions on what you can do.
+     */
     I2SGen4_RK &withFillCallbackRunAsISR(bool runAsISR = true) { userFillCallbackRunAsISR = runAsISR; return *this; };
 
 
-    I2SGen4_RK &withReceiveCallback(std::function<void(const void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t numChannels)> receiveCallback) { userReceiveCallback = receiveCallback; return *this; };
+    /**
+     * @brief Set the function to call when data is received by I2S.
+     * 
+     * @param receiveCallback 
+     * @return I2SGen4_RK& 
+     * 
+     * The receive callback or lambda has the prototype:
+     * 
+     * void callback(const void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount)
+     * 
+     * - buf The buffer where the data is stored.
+     * - bufSize The size of the buffer in bytes. This is getDmaPageSize().
+     * - sampleCount The number of samples in the buffer, taking into account the size in bits (16 or 24) and the number of channels (1 or 2, mono or stereo).
+     * - bytesPerSample 2 for 16-bit, or 4 for 24-bit, For 24 bit, samples are aligned on the LSB side (mask 0x00ffffff).
+     * - channelCount 1 for mono or 2 for stereo.
+     */
+    I2SGen4_RK &withReceiveCallback(std::function<void(const void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount)> receiveCallback) { userReceiveCallback = receiveCallback; return *this; };
 
 
+    /**
+     * @brief Set the receive callback to run at interrupt (ISR) level
+     * 
+     * @param runAsISR 
+     * @return I2SGen4_RK& 
+     * 
+     * By default, the receive callback runs from a thread. By using this call, you can run the callback at the ISR level, which has lower
+     * latency, but more restrictions on what you can do.
+     */
     I2SGen4_RK &withReceiveCallbackRunAsISR(bool runAsISR = true) { userReceiveCallbackRunAsISR = runAsISR; return *this; };
-
 
     /**
      * @brief Perform setup operations; call this from global application setup()
@@ -169,6 +210,10 @@ public:
      * You typically use I2SGen4_RK::instance().loop();
      */
     void loop();
+
+    void start() { g_rtl_i2s_api.init(); };
+
+    void stop() { g_rtl_i2s_api.deinit(); };
 
     /**
      * @brief Locks the mutex that protects shared resources
@@ -222,7 +267,9 @@ protected:
      * 
      * You generally will not return from this method.
      */
-    os_thread_return_t threadFunction(void);
+    os_thread_return_t fillThreadFunction(void);
+
+    os_thread_return_t receiveThreadFunction(void);
 
     /**
      * @brief Function that is called to fill the buffer to send
@@ -253,7 +300,7 @@ protected:
     /**
      * @brief User callback to fill a buffer to send
      */
-    std::function<void(void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t numChannels)> userFillCallback = 0;
+    std::function<void(void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount)> userFillCallback = 0;
 
     bool userFillCallbackRunAsISR = false;
 
@@ -261,7 +308,7 @@ protected:
      * @brief User callback to process a buffer received
      * 
      */
-    std::function<void(const void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t numChannels)> userReceiveCallback = 0;
+    std::function<void(const void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount)> userReceiveCallback = 0;
 
     bool userReceiveCallbackRunAsISR = false;
 
@@ -277,7 +324,9 @@ protected:
      * 
      * This is initialized in setup() so make sure you call the setup() method from the global application setup.
      */
-    Thread *thread = 0;
+    Thread *fillThread = 0;
+
+    Thread *receiveThread = 0;
 
     os_queue_t fillQueue;
 
