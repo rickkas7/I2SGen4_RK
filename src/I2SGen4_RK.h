@@ -341,6 +341,26 @@ protected:
 
 };
 
+class I2SGen4_TestSine16_RK {
+public:
+    I2SGen4_TestSine16_RK();
+
+    virtual ~I2SGen4_TestSine16_RK();
+
+    bool allocate(int frequencyHz, int samplesPerSecond);
+
+    int16_t getSample();
+
+    size_t getSampleCount() const { return sampleCount; };
+
+    void copySamples(int16_t *samplesOut, size_t sampleOutCount, size_t channelCount);
+
+protected:
+    int16_t *samples = 0;
+    size_t sampleCount = 0;
+    size_t index = 0;
+};
+
 
 /**
  * @brief Testing functions

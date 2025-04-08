@@ -14,6 +14,8 @@ SYSTEM_THREAD(ENABLED);
 SerialLogHandler logHandler(LOG_LEVEL_INFO);
 
 WM8960 codec;
+I2SGen4_TestSine16_RK testSine;
+
 
 void setup()
 {
@@ -197,6 +199,9 @@ void setup()
     {
         Log.error("The device did not respond. Please check wiring.");
     }
+    
+    // bool I2SGen4_TestSine16_RK::allocate(int frequencyHz, int sampleRateHz) 
+    testSine.allocate(1000, 16000);
 
     I2SGen4_RK::instance()
         .withSampleRate(16000)
@@ -204,7 +209,7 @@ void setup()
         .withDirection(I2SGen4_RK::Direction::TX_ONLY)
         .withBits16()
         .withFillCallback([](void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount) {
-            I2SGen4_Test_RK::generateSample16((int16_t*)buf, sampleCount, channelCount);
+            testSine.copySamples((int16_t *)buf, sampleCount, channelCount);
         })
         .withFillCallbackRunAsISR()
         .withReceiveCallback([](const void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount) {

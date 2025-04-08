@@ -1,5 +1,7 @@
 #include "I2SGen4_RK.h"
 
+#include <cmath>
+
 I2SGen4_RK *I2SGen4_RK::_instance;
 
 // [static]
@@ -65,7 +67,7 @@ os_thread_return_t I2SGen4_RK::receiveThreadFunction(void) {
 // [static]
 void I2SGen4_RK::fillCallbackStatic() {
     if (_instance) {
-        _instance->fillCallback();
+        _instance->fillCallback( );
     }
    
 }
@@ -131,6 +133,76 @@ void I2SGen4_RK::receiveCallbackInternal(void *buf) {
 
     g_rtl_i2s_api.returnRecvPage(); 
 }
+
+
+//
+// I2SGen4_TestSine16_RK
+//
+I2SGen4_TestSine16_RK::I2SGen4_TestSine16_RK() {
+}
+
+I2SGen4_TestSine16_RK::~I2SGen4_TestSine16_RK() {
+    if (samples) {
+        delete[] samples;
+        samples = nullptr;
+    }
+}
+
+bool I2SGen4_TestSine16_RK::allocate(int frequencyHz, int samplesPerSecond) {
+    const double pi = 3.14159265358979323846;
+
+    double sinePeriodSec = 1.0 / (double)frequencyHz;
+
+    double samplePeriodSec = 1.0 / (double)samplesPerSecond;
+
+    sampleCount = (size_t)ceil(sinePeriodSec * (float)samplesPerSecond);
+
+    // Log.info("sinePeriodSec=%lf samplePeriodSrc=%lf numSamples=%u", sinePeriodSec, samplePeriodSec, numSamples);
+
+    if (samples) {
+        delete[] samples;
+        samples = nullptr;
+    }
+    samples = new int16_t[sampleCount];
+    if (!samples) {
+        return false;
+    }
+
+    double t = 0;
+    for(size_t ii = 0; ii < sampleCount; ii++, t += samplePeriodSec) {
+        double val = 32767.0 * sin(2 * pi * (double)frequencyHz * t);
+
+        samples[ii] = (int16_t)val;
+    }
+
+    return true;
+}
+
+int16_t I2SGen4_TestSine16_RK::getSample() {
+    int16_t result = samples[index];
+
+    if (++index >= sampleCount) {
+        index = 0;
+    }
+
+    return result;
+}
+
+void I2SGen4_TestSine16_RK::copySamples(int16_t *samplesOut, size_t sampleOutCount, size_t channelCount) {
+    
+    size_t index = 0;
+    for(size_t ii = 0; ii < sampleOutCount; ii++) {
+        int16_t value = getSample();
+        for(size_t jj = 0; jj < channelCount; jj++) {
+            samplesOut[index++] = value;
+        }
+    }
+}
+
+
+
+
+
 
 //
 // I2SGen4_Test_RK
