@@ -67,7 +67,7 @@ void rtl_i2s_init() {
 	i2s_obj.sampling_rate = rtl_i2s_mapSampleRate(g_rtl_i2s_api.sampleRateHz);
 
 	// Valid values: WL_16b, WL_24b
-	i2s_obj.word_length = g_rtl_i2s_api.bits24 ? WL_24b : WL_24b;
+	i2s_obj.word_length = g_rtl_i2s_api.bits24 ? WL_24b : WL_16b;
 
 	// Valid directions:
 	// I2S_DIR_RX (0), I2S_DIR_TX (1), I2S_DIR_TXRX (2)

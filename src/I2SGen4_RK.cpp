@@ -160,6 +160,8 @@ bool I2SGen4_TestSine16_RK::allocate(int frequencyHz, int samplesPerSecond) {
         return false;
     }
 
+    // Setting this to frequencyHz to 1000 is generating 6000 Hz
+    
     // Log.info("sinePeriodSec=%lf samplePeriodSrc=%lf numSamples=%u", sinePeriodSec, samplePeriodSec, numSamples);
 
     if (samples) {

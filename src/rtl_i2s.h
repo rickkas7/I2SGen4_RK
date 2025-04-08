@@ -6,7 +6,7 @@ extern "C" {
 
 // 768 1536 3072
 // This is the size in bytes, and must be an integral number of samples (which is why this is 768 instead of 512 in case you are using 24 bit samples)
-#define RTL_I2S_DMA_PAGE_SIZE	3072   // 2 ~ 4096
+#define RTL_I2S_DMA_PAGE_SIZE	1536   // 2 ~ 4096
 #define RTL_I2S_DMA_PAGE_COUNT    4   // Vaild number is 2~4
 
 typedef void (*rtl_i2s_callback)(void *buf);

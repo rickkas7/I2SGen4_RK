@@ -211,7 +211,7 @@ void setup()
         .withFillCallback([](void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount) {
             testSine.copySamples((int16_t *)buf, sampleCount, channelCount);
         })
-        .withFillCallbackRunAsISR()
+        //.withFillCallbackRunAsISR()
         .withReceiveCallback([](const void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount) {
         })
         .setup();
