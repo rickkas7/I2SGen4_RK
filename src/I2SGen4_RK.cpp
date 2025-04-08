@@ -156,6 +156,9 @@ bool I2SGen4_TestSine16_RK::allocate(int frequencyHz, int samplesPerSecond) {
     double samplePeriodSec = 1.0 / (double)samplesPerSecond;
 
     sampleCount = (size_t)ceil(sinePeriodSec * (float)samplesPerSecond);
+    if (sampleCount < 2) {
+        return false;
+    }
 
     // Log.info("sinePeriodSec=%lf samplePeriodSrc=%lf numSamples=%u", sinePeriodSec, samplePeriodSec, numSamples);
 
@@ -201,52 +204,3 @@ void I2SGen4_TestSine16_RK::copySamples(int16_t *samplesOut, size_t sampleOutCou
 
 
 
-
-
-
-//
-// I2SGen4_Test_RK
-//
-
-
-// This is from the RTL SDK I2S example code
-// [static]
-const int16_t I2SGen4_Test_RK::sine16[16] = 
-{
-    0, 12539/4, 23170/4, 30273/4, 32767/4, 30273/4, 23170/4, 12539/4,
-    0, -12539/4, -23170/4, -30273/4, -32767/4, -30273/4, -23170/4, -12539/4
-};
-
-// This is from the RTL SDK I2S example code
-// [static]
-const int32_t I2SGen4_Test_RK::sine24[16] =
-{
-    0, 12539*256/4, 23170*256/4, 30273*256/4, 32767*256/4, 30273*256/4, 23170*256/4, 12539*256/4,
-    0, -12539*256/4, -23170*256/4, -30273*256/4, -32767*256/4, -30273*256/4, -23170*256/4, -12539*256/4
-};
-
-
-// This is from the RTL SDK I2S example code
-// [static]
-void I2SGen4_Test_RK::generateSample16(int16_t *buf, size_t sampleCount, size_t channelCount)
-{
-	for (size_t ii = 0; ii < sampleCount; ii += channelCount){
-		buf[ii] = sine16[(ii/channelCount)%16];
-		if(channelCount>=2) {
-        	buf[ii+1] = sine16[(ii/channelCount)%16];
-        }
-    }
-}
-
-
-// This is from the RTL SDK I2S example code
-// [static]
-void I2SGen4_Test_RK::generateSample24(int *buf, size_t sampleCount, size_t channelCount)
-{
-	for (size_t ii = 0; ii < sampleCount; ii += channelCount){
-		buf[ii] = sine24[(ii/channelCount)%16]&0xFFFFFF;
-		if(channelCount>=2) {
-			buf[ii+1] = sine24[(ii/channelCount)%16]&0xFFFFFF;
-        }
-    }
-}

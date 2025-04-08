@@ -341,18 +341,61 @@ protected:
 
 };
 
+/**
+ * @brief Generate 16-bit sine wave data
+ * 
+ */
 class I2SGen4_TestSine16_RK {
 public:
     I2SGen4_TestSine16_RK();
 
     virtual ~I2SGen4_TestSine16_RK();
 
+    /**
+     * @brief Allocate a new sine wave sample
+     * 
+     * @param frequencyHz Frequency in Hz for the sine wave.
+     * @param samplesPerSecond Sampling frequency for I2S.
+     * @return true for successful allocation or false for an error.
+     * 
+     * This method should be called to set up the sample and the frequency. It is not
+     * ISR safe as it allocates a buffer with the sine wave data in it.
+     */
     bool allocate(int frequencyHz, int samplesPerSecond);
 
+    /**
+     * @brief Get the next sample. This method is ISR safe.
+     * 
+     * @return int16_t The sample value
+     * 
+     * This object's index value is updated so the next time you call this method on an instance
+     * of this object, you'll get the next value.
+     */
     int16_t getSample();
 
+    /**
+     * @brief Get the number of samples in a full cycle of this sine wave
+     * 
+     * @return size_t Number of samples
+     * 
+     * This will vary depending on the frequencyHz (the frequency of the sine wave) and
+     * samplesPerSecond (the sampling rate for I2S).
+     */
     size_t getSampleCount() const { return sampleCount; };
 
+    /**
+     * @brief Copies samples into a buffer. This method is ISR safe.
+     * 
+     * @param samplesOut Buffer filled in with samples
+     * @param sampleOutCount Number of sample frames to write
+     * @param channelCount Number of channels (1 = mono, 2 = stereo)
+     *
+     * If you are writing a fill callback, these parameters are usee like this:
+     *  
+     *   .withFillCallback([](void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount) {
+     *       testSine.copySamples((int16_t *)buf, sampleCount, channelCount);
+     *   })
+     */
     void copySamples(int16_t *samplesOut, size_t sampleOutCount, size_t channelCount);
 
 protected:
@@ -361,17 +404,4 @@ protected:
     size_t index = 0;
 };
 
-
-/**
- * @brief Testing functions
- */
-class I2SGen4_Test_RK {
-public:
-    static void generateSample16(int16_t *buf, size_t sampleCount, size_t channelCount);
-    static void generateSample24(int *buf, size_t sampleCount, size_t channelCount);
-
-    static const int16_t sine16[]; // 16 elements
-    static const int32_t sine24[]; // 16 elements
-};
-    
 #endif  /* __I2SGEN4_RK_H */
