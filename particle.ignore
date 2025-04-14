@@ -1,2 +1,4 @@
 docs/**/*.*
 more-tests/**/*.*
+tests-to-delete/**/*.*
+target/**/*.*
