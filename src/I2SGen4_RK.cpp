@@ -12,7 +12,7 @@ I2SGen4_RK &I2SGen4_RK::instance() {
     return *_instance;
 }
 
-I2SGen4_RK::I2SGen4_RK() : I2SGen4_RK_AudioSettings<I2SGen4_RK>(this) {
+I2SGen4_RK::I2SGen4_RK() {
     #if (PLATFORM_ID == PLATFORM_P2) || (PLATFORM_ID == PLATFORM_MSOM)
     g_rtl_i2s_api.platform = PLATFORM_ID;
 #else
@@ -42,9 +42,9 @@ void I2SGen4_RK::loop() {
 }
 
 void I2SGen4_RK::start() { 
-    g_rtl_i2s_api.sampleRateHz = getSampleRateHz();
-    g_rtl_i2s_api.stereo = (int) getStereo();
-    g_rtl_i2s_api.bits24 = (int) getBits24();
+    g_rtl_i2s_api.sampleRateHz = audioSettings.getSampleRateHz();
+    g_rtl_i2s_api.stereo = (int) audioSettings.getStereo();
+    g_rtl_i2s_api.bits24 = (int) audioSettings.getBits24();
 
     g_rtl_i2s_api.init(); 
 }
@@ -145,15 +145,82 @@ void I2SGen4_RK::receiveCallbackInternal(void *buf) {
 
 
 //
-// I2SGen4_RK::ReceiveBuffer
+// I2SGen4_RK::BufferVector
 // 
-I2SGen4_RK::ReceiveBuffer::ReceiveBuffer() {
+I2SGen4_RK::BufferVector::~BufferVector() {
+    free();
+}
+
+void I2SGen4_RK::BufferVector::free() {
+    for(size_t ii = 0; ii < buffers.size(); ii++) {
+        delete buffers[ii];
+    }
+    buffers.clear();
+}
+
+
+void I2SGen4_RK::BufferVector::clear() {
+    for(size_t ii = 0; ii < buffers.size(); ii++) {
+        buffers[ii]->clear();
+    }
+}
+
+bool I2SGen4_RK::BufferVector::allocate(size_t numBuffers) {
+    bool result = true;
+
+    free();
+    buffers.reserve(numBuffers);
+    
+    for(size_t ii = 0; ii < numBuffers; ii++) {
+        Buffer *b = new Buffer();
+        if (!b) {
+            result = false;
+            break;
+        }
+        buffers.push_back(b);
+    }
+
+    return result;
+}
+
+void I2SGen4_RK::BufferVector::copyPage(uint8_t *dest) {
+    if (!atEOF()) {
+        size_t tempIndex = indexAtomic.fetch_add(1);
+
+        memcpy(dest, buffers[tempIndex]->buffer, Buffer::size);    
+    }
+    else {
+        memset(dest, 0, Buffer::size);
+    }
+}
+
+//
+// I2SGen4_RK::BufferConst
+// 
+
+size_t I2SGen4_RK::BufferConst::getOffset() const { 
+    size_t offset = offsetAtomic.load(); 
+    if (offset > bufSize) {
+        offset = bufSize;
+    }
+    return offset;
+}
+
+void I2SGen4_RK::BufferConst::copyPage(uint8_t *dest) {
+    size_t offset = offsetAtomic.fetch_add(RTL_I2S_DMA_PAGE_SIZE);
+
+    size_t count = bufSize - offset;
+    if (count > RTL_I2S_DMA_PAGE_SIZE) {
+        count = RTL_I2S_DMA_PAGE_SIZE;
+    }
+    memcpy(dest, &buf[offset], count);
+    if (count < RTL_I2S_DMA_PAGE_SIZE) {
+        memset(&dest[count], 0, RTL_I2S_DMA_PAGE_SIZE - count);
+    }
 
 }
 
-I2SGen4_RK::ReceiveBuffer::~ReceiveBuffer() {
 
-}
         
 //
 // I2SGen4_RK::SendBuffer

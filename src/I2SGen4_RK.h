@@ -3,165 +3,7 @@
 
 #include "Particle.h"
 #include "rtl_i2s.h"
-
-/**
- * @brief Container class for audio settings including sample rate, channels (stereo/mono), and bits per sample
- * 
- * This is a base class of I2SGen4_RK and you won't typically use this directly. If you want an isolated
- * container of settings, use I2SGen4_RK_AudioSettingsContainer instead.
- */
-template<class T>
-class I2SGen4_RK_AudioSettings {
-public:
-    /**
-     * @brief Construct object with default settings
-     * 
-     * sampleRateHz: 16000
-     * stereo: true
-     * bits24: false
-     */
-    I2SGen4_RK_AudioSettings(T *subclass) : subclass(subclass) {};
-
-    /**
-     * @brief Destructor. There is no additional storage used outside of the primitive class members (int, bool).
-     */
-    virtual ~I2SGen4_RK_AudioSettings() {};
-
-    /**
-     * @brief Set the sample rate in Hz. This value is stored but not validated by this method.
-     * 
-     * @param sampleRateHz 
-     * @return T& Reference to this object for chaining calls, fluent-style.
-     */
-    T &withSampleRateHz(int sampleRateHz) { this->sampleRateHz = sampleRateHz; return *subclass; };
-    
-    /**
-     * @brief Get the configured sample rate.
-     * 
-     * @return int 
-     */
-    int getSampleRateHz() const { return sampleRateHz; };
-
-    /**
-     * @brief Set mono (single channel)
-     * 
-     * @return T& 
-     */
-    T &withMono() { this->stereo = false; return *subclass; };
-
-    /**
-     * @brief Set stereo (two channels)
-     * 
-     * @param stereo true (default parameter) to set stereo
-     * @return T& 
-     */
-    T &withStereo(bool stereo) { this->stereo = stereo; return *subclass; };
-
-    /**
-     * @brief Set the number of channels (1 or 2)
-     * 
-     * @param channels Must be 1 or 2; if not valid stereo is assumed.
-     * @return T& 
-     */
-    T &withChannels(int channels) { this->stereo = (channels != 1); return *subclass; };
-
-    /**
-     * @brief Returns true if stereo (two channel mode)
-     * 
-     * @return true 
-     * @return false 
-     */
-    bool getStereo() const { return stereo; };
-
-    /**
-     * @brief Returns the number of channels (1 or 2)
-     * 
-     * @return int 
-     */
-    int getChannels() const { return stereo ? 2 : 1; };
-
-    /**
-     * @brief Set 16-bit mode. The default is 16-bit.
-     * 
-     * @return T& 
-     */
-    T &withBits16() { this->bits24 = false; return *subclass; };
-
-    /**
-     * @brief Set 24-bit mode. The default is 16-bit.
-     * 
-     * @param bits24 true to set 24-bit mode or false to set 16-bit mode.
-     * @return T& 
-     */
-    T &withBits24(bool bits24 = true) { this->bits24 = bits24; return *subclass; };
-    
-    /**
-     * @brief Returns true if using 24-bit mode, false if using 16-bit mode (the default).
-     * 
-     * @return int
-     */
-    bool getBits24() const { return bits24; };
-
-    /**
-     * @brief Copy constructor
-     * 
-     * @param src 
-     */
-    I2SGen4_RK_AudioSettings(const I2SGen4_RK_AudioSettings &src) {            
-        subclass = src.subclass;
-        sampleRateHz = src.sampleRateHz;
-        stereo = src.stereo;
-        bits24 = src.bits24;
-    }
-
-    /**
-     * @brief Copy operator
-     * 
-     * @param src 
-     * @return I2SGen4_RK_AudioSettings& 
-     */
-    I2SGen4_RK_AudioSettings& operator=(const I2SGen4_RK_AudioSettings &src) {
-        subclass = src.subclass;
-        sampleRateHz = src.sampleRateHz;
-        stereo = src.stereo;
-        bits24 = src.bits24;
-        return *this;
-    }
-
-    bool operator==(const I2SGen4_RK_AudioSettings &other) const {
-        return (sampleRateHz == other.sampleRateHz) && (stereo == other.stereo) && (bits24 == other.bits24);
-    }
-
-protected:
-    T *subclass;
-
-    /**
-     * @brief Sample rate in Hz. Default is 16000
-     * Valid values include: 8000, 16000, 24000, 32000, 48000, 96000, 44100.
-     */
-    int sampleRateHz = 16000;
-
-    /**
-     * @brief Stereo (true, the default), or mono (false)
-     */
-    bool stereo = true;
-
-    /**
-     * @brief 24-bit mode (true), or 16-bit mode (false, the default)
-     */
-    bool bits24 = false;
-};
-
-class I2SGen4_RK_AudioSettingsContainer : public I2SGen4_RK_AudioSettings<I2SGen4_RK_AudioSettingsContainer> {
-public:
-    I2SGen4_RK_AudioSettingsContainer() : I2SGen4_RK_AudioSettings(this) {};
-
-    I2SGen4_RK_AudioSettingsContainer(I2SGen4_RK_AudioSettings &src) : I2SGen4_RK_AudioSettings(this) {
-        this->sampleRateHz = src.getSampleRateHz();
-        this->stereo = src.getStereo();
-        this->bits24 = src.getBits24();
-    }
-};
+#include <atomic>
 
 /**
  * This class is a singleton; you do not create one as a global, on the stack, or with new.
@@ -172,7 +14,7 @@ public:
  * From global application loop you must call:
  * I2SGen4_RK::instance().loop();
  */
-class I2SGen4_RK : public I2SGen4_RK_AudioSettings<I2SGen4_RK> {
+class I2SGen4_RK {
 public:
     /**
      * @brief Direction
@@ -185,14 +27,227 @@ public:
         RX_TX = 2    //!< Both transmit and receive
     };
 
-
-    class ReceiveBuffer {
+    /**
+     * @brief Container class for audio settings including sample rate, channels (stereo/mono), and bits per sample
+     */
+    class AudioSettings {
     public:
-        ReceiveBuffer();
-        virtual ~ReceiveBuffer();
+        /**
+         * @brief Construct object with default settings
+         * 
+         * sampleRateHz: 16000
+         * stereo: true
+         * bits24: false
+         */
+        AudioSettings() {};
+
+        /**
+         * @brief Destructor. There is no additional storage used outside of the primitive class members (int, bool).
+         */
+        virtual ~AudioSettings() {};
+
+        /**
+         * @brief Set the sample rate in Hz. This value is stored but not validated by this method.
+         * 
+         * @param sampleRateHz 
+         * @return AudioSettings& Reference to this object for chaining calls, fluent-style.
+         */
+        AudioSettings &withSampleRateHz(int sampleRateHz) { this->sampleRateHz = sampleRateHz; return *this; };
+        
+        /**
+         * @brief Get the configured sample rate.
+         * 
+         * @return int 
+         */
+        int getSampleRateHz() const { return sampleRateHz; };
+
+        /**
+         * @brief Set mono (single channel)
+         * 
+         * @return AudioSettings& 
+         */
+        AudioSettings &withMono() { this->stereo = false; return *this; };
+
+        /**
+         * @brief Set stereo (two channels)
+         * 
+         * @param stereo true (default parameter) to set stereo
+         * @return AudioSettings& 
+         */
+        AudioSettings &withStereo(bool stereo) { this->stereo = stereo; return *this; };
+
+        /**
+         * @brief Set the number of channels (1 or 2)
+         * 
+         * @param channels Must be 1 or 2; if not valid stereo is assumed.
+         * @return AudioSettings& 
+         */
+        AudioSettings &withChannels(int channels) { this->stereo = (channels != 1); return *this; };
+
+        /**
+         * @brief Returns true if stereo (two channel mode)
+         * 
+         * @return true 
+         * @return false 
+         */
+        bool getStereo() const { return stereo; };
+
+        /**
+         * @brief Returns the number of channels (1 or 2)
+         * 
+         * @return int 
+         */
+        int getChannels() const { return stereo ? 2 : 1; };
+
+        /**
+         * @brief Set 16-bit mode. The default is 16-bit.
+         * 
+         * @return AudioSettings& 
+         */
+        AudioSettings &withBits16() { this->bits24 = false; return *this; };
+
+        /**
+         * @brief Set 24-bit mode. The default is 16-bit.
+         * 
+         * @param bits24 true to set 24-bit mode or false to set 16-bit mode.
+         * @return AudioSettings& 
+         */
+        AudioSettings &withBits24(bool bits24 = true) { this->bits24 = bits24; return *this; };
+        
+        /**
+         * @brief Returns true if using 24-bit mode, false if using 16-bit mode (the default).
+         * 
+         * @return int
+         */
+        bool getBits24() const { return bits24; };
+
+        /**
+         * @brief Copy constructor
+         * 
+         * @param src 
+         */
+        AudioSettings(const AudioSettings &src) {
+            sampleRateHz = src.sampleRateHz;
+            stereo = src.stereo;
+            bits24 = src.bits24;
+        }
+
+        /**
+         * @brief Copy operator
+         * 
+         * @param src 
+         * @return AudioSettings& 
+         */
+        AudioSettings& operator=(const AudioSettings &src) {
+            sampleRateHz = src.sampleRateHz;
+            stereo = src.stereo;
+            bits24 = src.bits24;
+            return *this;
+        }
+
+        /**
+         * @brief Equality operator - returns true if the sample rate, stereo, and bits24 settings are the same
+         * 
+         * @param other 
+         * @return true 
+         * @return false 
+         */
+        bool operator==(const AudioSettings &other) const {
+            return (sampleRateHz == other.sampleRateHz) && (stereo == other.stereo) && (bits24 == other.bits24);
+        }
+
+    protected:
+        /**
+         * @brief Sample rate in Hz. Default is 16000
+         * Valid values include: 8000, 16000, 24000, 32000, 48000, 96000, 44100.
+         */
+        int sampleRateHz = 16000;
+
+        /**
+         * @brief Stereo (true, the default), or mono (false)
+         */
+        bool stereo = true;
+
+        /**
+         * @brief 24-bit mode (true), or 16-bit mode (false, the default)
+         */
+        bool bits24 = false;
+    };
+
+    /**
+     * @brief Class to hold a copy of a single DMA buffer of audio data
+     */
+    class Buffer {
+    public:        
+        Buffer() {};
+        virtual ~Buffer() {};
+
+        void clear() { memset(buffer, 0, Buffer::size); };
+
+        Buffer(const Buffer &src) { memcpy(buffer, src.buffer, Buffer::size); };
+
+        Buffer &operator=(const Buffer &src) { memcpy(buffer, src.buffer, Buffer::size); return *this; };
+        
+        uint8_t buffer[RTL_I2S_DMA_PAGE_SIZE];
+
+        static const size_t size = RTL_I2S_DMA_PAGE_SIZE;
+    };
+
+    class BufferVector {
+    public:
+        BufferVector() { indexAtomic.store(0); };
+        virtual ~BufferVector();
+
+        void free();
 
         void clear();
 
+        void rewind() { indexAtomic.store(0); };
+
+        bool allocate(size_t numBuffers);
+
+        size_t getIndex() const { return indexAtomic.load(); };
+
+        bool atEOF() const { return getIndex() == buffers.size(); };
+
+        void copyPage(uint8_t *dest);
+
+
+    protected:
+        std::vector<Buffer*> buffers;
+        std::atomic<size_t> indexAtomic;
+    };
+
+    class BufferConst {
+    public:
+        BufferConst() { offsetAtomic.store(0); } ;
+        virtual ~BufferConst() {};
+
+        BufferConst(const uint8_t *buf, size_t bufSize) : buf(buf), bufSize(bufSize) { offsetAtomic.store(0); };
+
+        void rewind() { offsetAtomic.store(0); };
+
+        void set(const uint8_t *buf, size_t bufSize) { this->buf = buf; this->bufSize = bufSize; offsetAtomic.store(0); };
+
+        size_t getOffset() const;
+        size_t I2SGen4_getRemainder() const { return bufSize - getOffset(); };
+        
+        bool atEOF() const { return getOffset() >= bufSize; };
+
+        void copyPage(uint8_t *dest);
+
+    protected:
+        const uint8_t *buf = nullptr;
+        size_t bufSize = 0;
+
+        /**
+         * @brief Offset into the buffer using std::atomic
+         * 
+         * Note: The offset may be > bufSize; this will always occur if bufSize is not a multiple of Buffer::size
+         * but getOffset() will limit the value to bufSize. This is because of the way the offset is atomically
+         * incremented.
+         */
+        std::atomic<size_t> offsetAtomic;
     };
 
     class SendBuffer {
@@ -215,11 +270,74 @@ public:
      */
     static I2SGen4_RK &instance();
 
-    I2SGen4_RK_AudioSettings<I2SGen4_RK> &getAudioSettings() { return *this; };
+    /**
+     * @brief Set the sample rate in Hz. Default is 16000 Hz.
+     * 
+     * @param sampleRate 
+     * @return I2SGen4_RK& 
+     * 
+     * Valid values include: 8000, 16000, 24000, 32000, 48000, 96000, 44100.
+     * 
+     */
+    I2SGen4_RK &withSampleRateHz(int sampleRateHz) { audioSettings.withSampleRateHz(sampleRateHz); return *this; };
 
-    const I2SGen4_RK_AudioSettings<I2SGen4_RK> &getAudioSettings() const { return *this; };
-    
-    // I2SGen4_RK_AudioSettingsContainer getAudioSettingsCopy() const { return I2SGen4_RK_AudioSettingsContainer(*this); };
+    /**
+     * @brief Get the sample rate in Hz.
+     * 
+     * @return int 
+     */
+    int getSampleRateHz() const { return g_rtl_i2s_api.sampleRateHz; };
+
+    /**
+     * @brief Sets mono (monophonic, single channel) mode. Default is stereo.
+     * 
+     * @return I2SGen4_RK& 
+     * 
+     * Note: Mono 24-bit mode is not supported by the hardware!
+     */
+    I2SGen4_RK &withMono() { g_rtl_i2s_api.stereo = false; return *this; };
+
+    /**
+     * @brief Sets stereo (stereophonic, two channel) mode. Default is stereo.
+     *
+     * @param stereo Set the stereo flag or not (defaults to true) 
+     * 
+     * @return I2SGen4_RK& 
+     */
+    I2SGen4_RK &withStereo(bool stereo = true) { g_rtl_i2s_api.stereo = stereo; return *this; };
+
+    /**
+     * @brief Get the stereo flag (stereo = true, mono = false)
+     * 
+     * @return true 
+     * @return false 
+     */
+    bool getStereo(void) const { return g_rtl_i2s_api.stereo; };
+
+    /**
+     * @brief Sets 16-bit mode (the default)
+     * 
+     * @return I2SGen4_RK& 
+     */
+    I2SGen4_RK &withBits16() { g_rtl_i2s_api.bits24 = false; return *this; };
+
+    /**
+     * @brief Sets 24- bit mode
+     * 
+     * @param bits24 Set to true for 24 bit mode (default parameter), or false for 16-bit
+     * @return I2SGen4_RK& 
+     * 
+     * 32-bit mode is not supported.
+     */
+    I2SGen4_RK &withBits24(bool bits24 = true) { g_rtl_i2s_api.bits24 = bits24; return *this; };
+
+    /**
+     * @brief Get the 24 bit flag (true = 24 bits, false = 16 bits)
+     * 
+     * @return true 
+     * @return false 
+     */
+    bool getBits24(void) const { return g_rtl_i2s_api.bits24; };
 
     /**
      * @brief Set the direction (RX, TX, or both). Default is I2SGen4_RK::Direction::RX_TX.
@@ -437,6 +555,11 @@ protected:
      * This is initialized in setup() so make sure you call the setup() method from the global application setup.
      */
     os_mutex_t mutex = 0;
+
+    /**
+     * @brief Currently selected audio settings, see methods like withSampleRate()
+     */
+    AudioSettings audioSettings;
 
     /**
      * @brief Worker thread instance class
