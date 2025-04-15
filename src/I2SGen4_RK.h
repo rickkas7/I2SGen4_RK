@@ -176,69 +176,255 @@ public:
 
     /**
      * @brief Class to hold a copy of a single DMA buffer of audio data
+     * 
+     * Avoid allocating the object on the stack because it contains the buffer as member data, which is
+     * RTL_I2S_DMA_PAGE_SIZE bytes which can be large for a stack variable.
      */
     class Buffer {
-    public:        
+    public:
+        /**
+         * @brief Construct a buffer object. The buffer is always RTL_I2S_DMA_PAGE_SIZE bytes.
+         */
         Buffer() {};
+
+        /**
+         * @brief Destruct the buffer object. This object does not contain any heap allocated data outside of the object.
+         */
         virtual ~Buffer() {};
 
+        /**
+         * @brief Set the value of every byte to 0
+         */
         void clear() { memset(buffer, 0, Buffer::size); };
 
+        /**
+         * @brief Construct a Buffer object as a copy of another one.
+         * 
+         * @param src 
+         */
         Buffer(const Buffer &src) { memcpy(buffer, src.buffer, Buffer::size); };
 
+        /**
+         * @brief Sets the contents of this buffer to be equal to the contents of another.
+         * 
+         * @param src 
+         * @return Buffer& 
+         * 
+         * This method does not allocate any memory.
+         */
         Buffer &operator=(const Buffer &src) { memcpy(buffer, src.buffer, Buffer::size); return *this; };
-        
+
+        /**
+         * @brief The buffer of data bytes, always RTL_I2S_DMA_PAGE_SIZE
+         */
         uint8_t buffer[RTL_I2S_DMA_PAGE_SIZE];
 
+        /**
+         * @brief Convenience static method Buffer::size() returns RTL_I2S_DMA_PAGE_SIZE, the size of the buffer.
+         */
         static const size_t size = RTL_I2S_DMA_PAGE_SIZE;
     };
 
-    class BufferVector {
+    /**
+     * @brief Abstract base class for buffers that can be streamed, typically for playing audio
+     * 
+     * The BufferVector and BufferConst both are BufferStreamable.
+     */
+    class BufferStreamable {
     public:
+        /**
+         * @brief Returns true of at the end of the stream
+         * 
+         * @return true 
+         * @return false 
+         */
+        virtual bool atEOF() = 0;
+
+        /**
+         * @brief Call to copy the next page of RTL_I2S_DMA_PAGE_SIZE bytes
+         * 
+         * @param dest 
+         */
+        virtual void copyPage(uint8_t *dest) = 0;        
+    };
+
+    /**
+     * @brief Class to hold a Vector of Buffer objects to hold a large audio sample
+     * 
+     * This object pre-allocates all of the memory to assure it can be done, and also because the library callback
+     * can run as an ISR where it cannot allocate additional buffers.
+     */
+    class BufferVector : public BufferStreamable {
+    public:
+        /**
+         * @brief Construct an object with no buffers allocated
+         */
         BufferVector() { indexAtomic.store(0); };
+
+        /**
+         * @brief Destructor. This deletes the buffer pointers in the vector, as well.
+         * 
+         */
         virtual ~BufferVector();
 
+        /**
+         * @brief Frees the buffer pointers in the vector, and sets the vector length to 0.
+         * 
+         */
         void free();
 
+        /**
+         * @brief Zero out all buffers in the vector. This will produce silence if played.
+         */
         void clear();
 
+        /**
+         * @brief Rewind the buffer so reading it using copyPage() will start over from the beginning
+         * 
+         * This method is safe to call from an ISR.
+         */
         void rewind() { indexAtomic.store(0); };
 
+        /**
+         * @brief Allocate the specified number of buffers
+         * 
+         * @param numBuffers 
+         * @return true 
+         * @return false 
+         * 
+         * This deletes and previous buffers and rewinds to the beginning. If an out of memory condition
+         * occurs, false will be returned. The vector will contain as many buffers as could be allocated,
+         * but will still be valid.
+         */
         bool allocate(size_t numBuffers);
 
+        /**
+         * @brief Get the current index into the vector to use next.
+         * 
+         * @return size_t 
+         */
         size_t getIndex() const { return indexAtomic.load(); };
 
-        bool atEOF() const { return getIndex() == buffers.size(); };
+        /**
+         * @brief Returns true if all of the buffers in the vector have been consumed.
+         * 
+         * @return true 
+         * @return false 
+         * 
+         * This method is safe to call from an ISR. This method is part of the implementation of BufferStreamable.
+         */
+        virtual bool atEOF() const { return getIndex() == buffers.size(); };
 
-        void copyPage(uint8_t *dest);
+        /**
+         * @brief Copy a buffer out of the vector into dest. Always copies RTL_I2S_DMA_PAGE_SIZE bytes.
+         * 
+         * @param dest 
+         * 
+         * If you are atEOF() then dest will be filled will bytes with a 0 value.
+         * 
+         * This method is safe to call from an ISR. This method is part of the implementation of BufferStreamable.
+         */
+        virtual void copyPage(uint8_t *dest);
 
 
     protected:
+        /**
+         * @brief Vector of Buffer objects. These objects are allocated during allocate() and are owned by this object.
+         */
         std::vector<Buffer*> buffers;
+
+        /**
+         * @brief index (0-based) into the vector. This is a std::atomic atomic variable.
+         */
         std::atomic<size_t> indexAtomic;
     };
 
-    class BufferConst {
+    /**
+     * @brief Class typically used to stream data out of a const uint8_t array
+     */
+    class BufferConst : public BufferStreamable {
     public:
+        /**
+         * @brief Construct a the object without setting the data; use set() to do that when using this constructor
+         */
         BufferConst() { offsetAtomic.store(0); } ;
+
+        /**
+         * @brief Destructor. This does not delete the underlying data.
+         */
         virtual ~BufferConst() {};
 
+        /**
+         * @brief Construct an object for the specified buffer. The buffer is not copied and must remain valid for the life of this object.
+         * 
+         * @param buf Pointer to uint8_t array
+         * @param bufSize Size of uint8_t array in bytes
+         * 
+         * The buffer is not deleted when this object is deleted; you retain ownership of the buffer.
+         */
         BufferConst(const uint8_t *buf, size_t bufSize) : buf(buf), bufSize(bufSize) { offsetAtomic.store(0); };
 
-        void rewind() { offsetAtomic.store(0); };
 
+        /**
+         * @brief Use the specified buffer. The buffer is not copied and must remain valid for the life of this object.
+         * 
+         * @param buf Pointer to uint8_t array
+         * @param bufSize Size of uint8_t array in bytes
+         * 
+         * The buffer is not deleted when this object is deleted; you retain ownership of the buffer.
+         */
         void set(const uint8_t *buf, size_t bufSize) { this->buf = buf; this->bufSize = bufSize; offsetAtomic.store(0); };
 
-        size_t getOffset() const;
-        size_t I2SGen4_getRemainder() const { return bufSize - getOffset(); };
-        
-        bool atEOF() const { return getOffset() >= bufSize; };
+        /**
+         * @brief Rewind so copyPage will start copying from the beginning again.
+         * 
+         * This method is safe to call from an ISR.
+         */
+        void rewind() { offsetAtomic.store(0); };
 
-        void copyPage(uint8_t *dest);
+        /**
+         * @brief Get the current offset being read from for copyPage.
+         * 
+         * @return size_t 
+         * 
+         * This method is safe to call from an ISR.
+         */
+        size_t getOffset() const;
+
+        /**
+         * @brief Get the number of bytes left to be copied using copyPage.
+         * 
+         * @return size_t 
+         * 
+         * This method is safe to call from an ISR.
+         */
+        size_t getRemainder() const { return bufSize - getOffset(); };
+        
+        /**
+         * @brief Returns true if all data has been copied.
+         * 
+         * @return true 
+         * @return false 
+         * 
+         * This method is safe to call from an ISR. This method is part of the implementation of BufferStreamable.
+         */
+        virtual bool atEOF() const { return getOffset() >= bufSize; };
+
+        /**
+         * @brief Copies RTL_I2S_DMA_PAGE_SIZE bytes of data to dest
+         * 
+         * @param dest Filled in with data or zero bytes
+         * 
+         * If at EOF, dest is filled with bytes with the value 0. If the buf is not an multiple of 
+         * RTL_I2S_DMA_PAGE_SIZE bytes, then it will be padded to 0 bytes.
+         * 
+         * This method is safe to call from an ISR. This method is part of the implementation of BufferStreamable.
+         */
+        virtual void copyPage(uint8_t *dest);
 
     protected:
-        const uint8_t *buf = nullptr;
-        size_t bufSize = 0;
+        const uint8_t *buf = nullptr; //!< The buffer passed into the constructor or set() method (not a copy)
+        size_t bufSize = 0; //!< THe size of the buffer passed int othe constructor or set() method
 
         /**
          * @brief Offset into the buffer using std::atomic
