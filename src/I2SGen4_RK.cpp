@@ -12,7 +12,7 @@ I2SGen4_RK &I2SGen4_RK::instance() {
     return *_instance;
 }
 
-I2SGen4_RK::I2SGen4_RK() {
+I2SGen4_RK::I2SGen4_RK() : I2SGen4_RK_AudioSettings<I2SGen4_RK>(this) {
     #if (PLATFORM_ID == PLATFORM_P2) || (PLATFORM_ID == PLATFORM_MSOM)
     g_rtl_i2s_api.platform = PLATFORM_ID;
 #else
@@ -40,6 +40,15 @@ void I2SGen4_RK::setup() {
 void I2SGen4_RK::loop() {
     // Put your code to run during the application thread loop here
 }
+
+void I2SGen4_RK::start() { 
+    g_rtl_i2s_api.sampleRateHz = getSampleRateHz();
+    g_rtl_i2s_api.stereo = (int) getStereo();
+    g_rtl_i2s_api.bits24 = (int) getBits24();
+
+    g_rtl_i2s_api.init(); 
+}
+
 
 os_thread_return_t I2SGen4_RK::fillThreadFunction(void) {
     while(true) {
@@ -134,6 +143,31 @@ void I2SGen4_RK::receiveCallbackInternal(void *buf) {
     g_rtl_i2s_api.returnRecvPage(); 
 }
 
+
+//
+// I2SGen4_RK::ReceiveBuffer
+// 
+I2SGen4_RK::ReceiveBuffer::ReceiveBuffer() {
+
+}
+
+I2SGen4_RK::ReceiveBuffer::~ReceiveBuffer() {
+
+}
+        
+//
+// I2SGen4_RK::SendBuffer
+// 
+I2SGen4_RK::SendBuffer::SendBuffer() {
+
+}
+I2SGen4_RK::SendBuffer::~SendBuffer() {
+
+}
+
+I2SGen4_RK::SendBuffer::SendBuffer(const void *buf, size_t bufSize) {
+
+}
 
 //
 // I2SGen4_TestSine16_RK

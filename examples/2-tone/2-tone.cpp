@@ -25,7 +25,7 @@ void setup()
     testSine.allocate(1000, sampleRate);
 
     I2SGen4_RK::instance()
-        .withSampleRate(sampleRate)
+        .withSampleRateHz(sampleRate)
         .withStereo()
         .withDirection(I2SGen4_RK::Direction::TX_ONLY)
         .withBits16()

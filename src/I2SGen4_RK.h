@@ -5,6 +5,165 @@
 #include "rtl_i2s.h"
 
 /**
+ * @brief Container class for audio settings including sample rate, channels (stereo/mono), and bits per sample
+ * 
+ * This is a base class of I2SGen4_RK and you won't typically use this directly. If you want an isolated
+ * container of settings, use I2SGen4_RK_AudioSettingsContainer instead.
+ */
+template<class T>
+class I2SGen4_RK_AudioSettings {
+public:
+    /**
+     * @brief Construct object with default settings
+     * 
+     * sampleRateHz: 16000
+     * stereo: true
+     * bits24: false
+     */
+    I2SGen4_RK_AudioSettings(T *subclass) : subclass(subclass) {};
+
+    /**
+     * @brief Destructor. There is no additional storage used outside of the primitive class members (int, bool).
+     */
+    virtual ~I2SGen4_RK_AudioSettings() {};
+
+    /**
+     * @brief Set the sample rate in Hz. This value is stored but not validated by this method.
+     * 
+     * @param sampleRateHz 
+     * @return T& Reference to this object for chaining calls, fluent-style.
+     */
+    T &withSampleRateHz(int sampleRateHz) { this->sampleRateHz = sampleRateHz; return *subclass; };
+    
+    /**
+     * @brief Get the configured sample rate.
+     * 
+     * @return int 
+     */
+    int getSampleRateHz() const { return sampleRateHz; };
+
+    /**
+     * @brief Set mono (single channel)
+     * 
+     * @return T& 
+     */
+    T &withMono() { this->stereo = false; return *subclass; };
+
+    /**
+     * @brief Set stereo (two channels)
+     * 
+     * @param stereo true (default parameter) to set stereo
+     * @return T& 
+     */
+    T &withStereo(bool stereo) { this->stereo = stereo; return *subclass; };
+
+    /**
+     * @brief Set the number of channels (1 or 2)
+     * 
+     * @param channels Must be 1 or 2; if not valid stereo is assumed.
+     * @return T& 
+     */
+    T &withChannels(int channels) { this->stereo = (channels != 1); return *subclass; };
+
+    /**
+     * @brief Returns true if stereo (two channel mode)
+     * 
+     * @return true 
+     * @return false 
+     */
+    bool getStereo() const { return stereo; };
+
+    /**
+     * @brief Returns the number of channels (1 or 2)
+     * 
+     * @return int 
+     */
+    int getChannels() const { return stereo ? 2 : 1; };
+
+    /**
+     * @brief Set 16-bit mode. The default is 16-bit.
+     * 
+     * @return T& 
+     */
+    T &withBits16() { this->bits24 = false; return *subclass; };
+
+    /**
+     * @brief Set 24-bit mode. The default is 16-bit.
+     * 
+     * @param bits24 true to set 24-bit mode or false to set 16-bit mode.
+     * @return T& 
+     */
+    T &withBits24(bool bits24 = true) { this->bits24 = bits24; return *subclass; };
+    
+    /**
+     * @brief Returns true if using 24-bit mode, false if using 16-bit mode (the default).
+     * 
+     * @return int
+     */
+    bool getBits24() const { return bits24; };
+
+    /**
+     * @brief Copy constructor
+     * 
+     * @param src 
+     */
+    I2SGen4_RK_AudioSettings(const I2SGen4_RK_AudioSettings &src) {            
+        subclass = src.subclass;
+        sampleRateHz = src.sampleRateHz;
+        stereo = src.stereo;
+        bits24 = src.bits24;
+    }
+
+    /**
+     * @brief Copy operator
+     * 
+     * @param src 
+     * @return I2SGen4_RK_AudioSettings& 
+     */
+    I2SGen4_RK_AudioSettings& operator=(const I2SGen4_RK_AudioSettings &src) {
+        subclass = src.subclass;
+        sampleRateHz = src.sampleRateHz;
+        stereo = src.stereo;
+        bits24 = src.bits24;
+        return *this;
+    }
+
+    bool operator==(const I2SGen4_RK_AudioSettings &other) const {
+        return (sampleRateHz == other.sampleRateHz) && (stereo == other.stereo) && (bits24 == other.bits24);
+    }
+
+protected:
+    T *subclass;
+
+    /**
+     * @brief Sample rate in Hz. Default is 16000
+     * Valid values include: 8000, 16000, 24000, 32000, 48000, 96000, 44100.
+     */
+    int sampleRateHz = 16000;
+
+    /**
+     * @brief Stereo (true, the default), or mono (false)
+     */
+    bool stereo = true;
+
+    /**
+     * @brief 24-bit mode (true), or 16-bit mode (false, the default)
+     */
+    bool bits24 = false;
+};
+
+class I2SGen4_RK_AudioSettingsContainer : public I2SGen4_RK_AudioSettings<I2SGen4_RK_AudioSettingsContainer> {
+public:
+    I2SGen4_RK_AudioSettingsContainer() : I2SGen4_RK_AudioSettings(this) {};
+
+    I2SGen4_RK_AudioSettingsContainer(I2SGen4_RK_AudioSettings &src) : I2SGen4_RK_AudioSettings(this) {
+        this->sampleRateHz = src.getSampleRateHz();
+        this->stereo = src.getStereo();
+        this->bits24 = src.getBits24();
+    }
+};
+
+/**
  * This class is a singleton; you do not create one as a global, on the stack, or with new.
  * 
  * From global application setup you must call:
@@ -13,7 +172,7 @@
  * From global application loop you must call:
  * I2SGen4_RK::instance().loop();
  */
-class I2SGen4_RK {
+class I2SGen4_RK : public I2SGen4_RK_AudioSettings<I2SGen4_RK> {
 public:
     /**
      * @brief Direction
@@ -26,6 +185,29 @@ public:
         RX_TX = 2    //!< Both transmit and receive
     };
 
+
+    class ReceiveBuffer {
+    public:
+        ReceiveBuffer();
+        virtual ~ReceiveBuffer();
+
+        void clear();
+
+    };
+
+    class SendBuffer {
+    public:
+        SendBuffer();
+        virtual ~SendBuffer();
+
+        SendBuffer(const void *buf, size_t bufSize);
+
+    protected:
+        const void *buf = nullptr;
+        size_t bufSize = 0;
+    };
+
+
     /**
      * @brief Gets the singleton instance of this class, allocating it if necessary
      * 
@@ -33,74 +215,11 @@ public:
      */
     static I2SGen4_RK &instance();
 
-    /**
-     * @brief Set the sample rate in Hz. Default is 16000 Hz.
-     * 
-     * @param sampleRate 
-     * @return I2SGen4_RK& 
-     * 
-     * Valid values include: 8000, 16000, 24000, 32000, 48000, 96000, 44100.
-     * 
-     */
-    I2SGen4_RK &withSampleRate(int sampleRateHz) { g_rtl_i2s_api.sampleRateHz = sampleRateHz; return *this; };
+    I2SGen4_RK_AudioSettings<I2SGen4_RK> &getAudioSettings() { return *this; };
 
-    /**
-     * @brief Get the sample rate in Hz.
-     * 
-     * @return int 
-     */
-    int getSampleRate() const { return g_rtl_i2s_api.sampleRateHz; };
-
-    /**
-     * @brief Sets mono (monophonic, single channel) mode. Default is stereo.
-     * 
-     * @return I2SGen4_RK& 
-     * 
-     * Note: Mono 24-bit mode is not supported by the hardware!
-     */
-    I2SGen4_RK &withMono() { g_rtl_i2s_api.stereo = false; return *this; };
-
-    /**
-     * @brief Sets stereo (stereophonic, two channel) mode. Default is stereo.
-     *
-     * @param stereo Set the stereo flag or not (defaults to true) 
-     * 
-     * @return I2SGen4_RK& 
-     */
-    I2SGen4_RK &withStereo(bool stereo = true) { g_rtl_i2s_api.stereo = stereo; return *this; };
-
-    /**
-     * @brief Get the stereo flag (stereo = true, mono = false)
-     * 
-     * @return true 
-     * @return false 
-     */
-    bool getStereo(void) const { return g_rtl_i2s_api.stereo; };
-
-    /**
-     * @brief Sets 16-bit mode (the default)
-     * 
-     * @return I2SGen4_RK& 
-     */
-    I2SGen4_RK &withBits16() { g_rtl_i2s_api.bits24 = false; return *this; };
-
-    /**
-     * @brief Sets 24- bit mode
-     * 
-     * @param bits24 Set to true for 24 bit mode (default parameter), or false for 16-bit
-     * @return I2SGen4_RK& 
-     * 
-     * 32-bit mode is not supported.
-     */
-    I2SGen4_RK &withBits24(bool bits24 = true) { g_rtl_i2s_api.bits24 = bits24; return *this; };
-
-    /**
-     * @brief Get the 24 bit flag (true = 24 bits, false = 16 bits)
-     * 
-     * @return true 
-     * @return false 
-     */
-    bool getBits24(void) const { return g_rtl_i2s_api.bits24; };
+    const I2SGen4_RK_AudioSettings<I2SGen4_RK> &getAudioSettings() const { return *this; };
+    
+    // I2SGen4_RK_AudioSettingsContainer getAudioSettingsCopy() const { return I2SGen4_RK_AudioSettingsContainer(*this); };
 
     /**
      * @brief Set the direction (RX, TX, or both). Default is I2SGen4_RK::Direction::RX_TX.
@@ -211,7 +330,7 @@ public:
      */
     void loop();
 
-    void start() { g_rtl_i2s_api.init(); };
+    void start();
 
     void stop() { g_rtl_i2s_api.deinit(); };
 
