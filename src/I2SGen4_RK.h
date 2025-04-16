@@ -396,6 +396,7 @@ public:
          */
         BufferConst(const uint8_t *buf, size_t bufSize) : buf(buf), bufSize(bufSize) { offsetAtomic.store(0); };
 
+        BufferConst &withContinuousLoop(bool continuousLoop = true) { this->continuousLoop = continuousLoop; return *this; };
 
         /**
          * @brief Use the specified buffer. The buffer is not copied and must remain valid for the life of this object.
@@ -457,6 +458,8 @@ public:
     protected:
         const uint8_t *buf = nullptr; //!< The buffer passed into the constructor or set() method (not a copy)
         size_t bufSize = 0; //!< THe size of the buffer passed int othe constructor or set() method
+
+        bool continuousLoop = false;
 
         /**
          * @brief Offset into the buffer using std::atomic
@@ -885,11 +888,45 @@ public:
 
     virtual ~I2SGen4_TestSine16_RK();
 
+    /**
+     * @brief Set the settings from an AudioSettings object (recommended). Call before allocate(),
+     * 
+     * @param settings 
+     * @return I2SGen4_TestSine16_RK& 
+     * 
+     * You should create an AudioSettings object with your settings, and pass it to both this class and the I2SGen4_RK
+     * class so they have the same settings. 
+     */
+    I2SGen4_TestSine16_RK &withAudioSettings(const I2SGen4_RK::AudioSettings &settings);
+
+    /**
+     * @brief Set the number of sample frames. Call before allocate()
+     * 
+     * @param samplesFramesPerBuffer 
+     * @return I2SGen4_TestSine16_RK& 
+     * 
+     * It's often easier to use withAudioSettings() instead of manually setting the same frames per buffer and withChannelCount.
+     * 
+     * The formula for sample frames per buffer is:alignas
+     * 
+     * RTL_I2S_DMA_PAGE_SIZE / bytes per sample / number of channels
+     * 
+     * Since this class only supports 16-bit mode, bytes per sample is always 2.
+     */
     I2SGen4_TestSine16_RK &withSamplesFramesPerBuffer(size_t samplesFramesPerBuffer) { this->samplesFramesPerBuffer = samplesFramesPerBuffer; return *this; };
 
+    /**
+     * @brief Sets the channel count. Call before allocate().
+     * 
+     * @param channelCount 
+     * @return I2SGen4_TestSine16_RK& 
+     * 
+     * It's often easier to use withAudioSettings() instead of manually setting the same frames per buffer and withChannelCount.
+     * 
+     * Only supported channel counts are 1 (mono) and 2 (stereo).
+     */
     I2SGen4_TestSine16_RK &withChannelCount(size_t channelCount) { this->channelCount = channelCount; return *this; };
 
-    I2SGen4_TestSine16_RK &withAudioSettings(const I2SGen4_RK::AudioSettings &settings);
 
     /**
      * @brief Allocate a new sine wave sample
@@ -942,11 +979,11 @@ public:
     virtual void copyPage(uint8_t *dest);
 
 protected:
-    int16_t *samples = 0;
-    size_t samplesFramesPerBuffer = 0;
-    size_t channelCount = 1;
-    size_t sampleCount = 0;
-    size_t index = 0;
+    int16_t *samples = 0; //!< Array of samples, allocated in allocate(), deleted in destructor
+    size_t sampleCount = 0; //!< Number of samples in the samples array
+    size_t samplesFramesPerBuffer = 0; //!< Number of sample frames per buffer (configuration parameter)
+    size_t channelCount = 1; //!< Number of channels (configuration parameter)
+    std::atomic<size_t> indexAtomic; //!< Current index into samples, updated on getSample()
 };
 
 #endif  /* __I2SGEN4_RK_H */

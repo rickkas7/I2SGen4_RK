@@ -237,17 +237,25 @@ size_t I2SGen4_RK::BufferConst::getOffset() const {
 }
 
 void I2SGen4_RK::BufferConst::copyPage(uint8_t *dest) {
-    size_t offset = offsetAtomic.fetch_add(RTL_I2S_DMA_PAGE_SIZE);
+    if (!atEOF()) {
+        size_t offset = offsetAtomic.fetch_add(RTL_I2S_DMA_PAGE_SIZE);
 
-    size_t count = bufSize - offset;
-    if (count > RTL_I2S_DMA_PAGE_SIZE) {
-        count = RTL_I2S_DMA_PAGE_SIZE;
-    }
-    memcpy(dest, &buf[offset], count);
-    if (count < RTL_I2S_DMA_PAGE_SIZE) {
-        memset(&dest[count], 0, RTL_I2S_DMA_PAGE_SIZE - count);
-    }
+        size_t count = bufSize - offset;
+        if (count > RTL_I2S_DMA_PAGE_SIZE) {
+            count = RTL_I2S_DMA_PAGE_SIZE;
+        }
+        memcpy(dest, &buf[offset], count);
+        if (count < RTL_I2S_DMA_PAGE_SIZE) {
+            memset(&dest[count], 0, RTL_I2S_DMA_PAGE_SIZE - count);
+        }
 
+        if (continuousLoop && offsetAtomic.load() >= bufSize) {
+            offsetAtomic.store(0);
+        }
+    }
+    else {
+        memset(dest, 0, Buffer::size);
+    }
 }
 
 
@@ -298,15 +306,15 @@ bool I2SGen4_TestSine16_RK::allocate(int frequencyHz, int samplesPerSecond) {
         samples[ii] = (int16_t)val;
     }
 
+    indexAtomic.store(0);
+
     return true;
 }
 
 int16_t I2SGen4_TestSine16_RK::getSample() {
-    int16_t result = samples[index];
+    size_t tempIndex = indexAtomic.fetch_add(1);
 
-    if (++index >= sampleCount) {
-        index = 0;
-    }
+    int16_t result = samples[tempIndex % sampleCount];
 
     return result;
 }

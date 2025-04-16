@@ -20,10 +20,8 @@ void setup()
     Particle.function("freq", freqFunction);
     
     // The next line is only used during development to see early log messages
-    waitFor(Serial.isConnected, 10000); delay(2000);
+    // waitFor(Serial.isConnected, 10000); delay(2000);
     
-
-
     audioSettings
         .withSampleRateHz(sampleRate)
         .withStereo()
