@@ -477,7 +477,7 @@ public:
     static I2SGen4_RK &instance();
 
     /**
-     * @brief Set the sample rate, number of channels, and number of bits. Must be called before setup.
+     * @brief Set the sample rate, number of channels, and number of bits. Must be called before start().
      * 
      * @param settings 
      * @return I2SGen4_RK& 
@@ -485,7 +485,7 @@ public:
     I2SGen4_RK &withAudioSettings(const AudioSettings &settings) { audioSettings = settings; return *this; };
 
     /**
-     * @brief Set the sample rate in Hz. Default is 16000 Hz.
+     * @brief Set the sample rate in Hz. Default is 16000 Hz. Must be called before start().
      * 
      * @param sampleRate 
      * @return I2SGen4_RK& 
@@ -503,7 +503,7 @@ public:
     int getSampleRateHz() const { return audioSettings.getSampleRateHz(); };
 
     /**
-     * @brief Sets mono (monophonic, single channel) mode. Default is stereo.
+     * @brief Sets mono (monophonic, single channel) mode. Default is stereo. Must be called before start().
      * 
      * @return I2SGen4_RK& 
      * 
@@ -512,7 +512,7 @@ public:
     I2SGen4_RK &withMono() { audioSettings.withMono(); return *this; };
 
     /**
-     * @brief Sets stereo (stereophonic, two channel) mode. Default is stereo.
+     * @brief Sets stereo (stereophonic, two channel) mode. Default is stereo. Must be called before start().
      *
      * @param stereo Set the stereo flag or not (defaults to true) 
      * 
@@ -529,14 +529,14 @@ public:
     bool getStereo(void) const { return audioSettings.getStereo(); };
 
     /**
-     * @brief Sets 16-bit mode (the default)
+     * @brief Sets 16-bit mode (the default). Must be called before start().
      * 
      * @return I2SGen4_RK& 
      */
     I2SGen4_RK &withBits16() { audioSettings.withBits16(); return *this; };
 
     /**
-     * @brief Sets 24- bit mode
+     * @brief Sets 24- bit mode. Must be called before start().
      * 
      * @param bits24 Set to true for 24 bit mode (default parameter), or false for 16-bit
      * @return I2SGen4_RK& 
@@ -568,7 +568,7 @@ public:
     I2SGen4_RK::AudioSettings &getAudioSettings() { return audioSettings; };
 
     /**
-     * @brief Set the direction (RX, TX, or both). Default is I2SGen4_RK::Direction::RX_TX.
+     * @brief Set the direction (RX, TX, or both). Default is I2SGen4_RK::Direction::RX_TX. Must be called before start().
      * 
      * @param dir 
      * @return I2SGen4_RK& 
@@ -601,7 +601,7 @@ public:
     int getDmaPageCount() const { return RTL_I2S_DMA_PAGE_COUNT; };
     
     /**
-     * @brief Play audio from a BufferStreamable class (such as BufferVector, BufferConst, or I2SGen4_TestSine16_RK)
+     * @brief Play audio from a BufferStreamable class (such as BufferVector, BufferConst, or I2SGen4_TestSine16_RK). Must be called before start().
      * 
      * @param stream The stream to readFrom using copyPage
      * @param runAsISR Run as ISR. Default value is true; BufferVector. BufferConst, and I2SGen4_TestSine16_RK are all ISR safe.
@@ -610,7 +610,7 @@ public:
     I2SGen4_RK &withFillFromBufferStreamable(BufferStreamable *stream, bool runAsISR = true);    
 
     /**
-     * @brief Set function that is called to fill a buffer with I2S samples to send
+     * @brief Set function that is called to fill a buffer with I2S samples to send. Must be called before start().
      * 
      * @param fillCallback 
      * @return I2SGen4_RK& 
@@ -629,7 +629,7 @@ public:
 
 
     /**
-     * @brief Set the fill callback to run at interrupt (ISR) level
+     * @brief Set the fill callback to run at interrupt (ISR) level. Must be called before start().
      * 
      * @param runAsISR 
      * @return I2SGen4_RK& 
@@ -640,7 +640,7 @@ public:
     I2SGen4_RK &withFillCallbackRunAsISR(bool runAsISR = true) { userFillCallbackRunAsISR = runAsISR; return *this; };
 
     /**
-     * @brief Store audio in a BufferStreamable class (such as BufferVector)
+     * @brief Store audio in a BufferStreamable class (such as BufferVector). Must be called before start().
      * 
      * @param stream The stream to write to using writePage
      * @param runAsISR Run as ISR. Default value is true; BufferVector is ISR safe.
@@ -649,7 +649,7 @@ public:
     I2SGen4_RK &withReceiveToBufferStreamable(BufferStreamable *stream, bool runAsISR = true);    
 
     /**
-     * @brief Set the function to call when data is received by I2S.
+     * @brief Set the function to call when data is received by I2S. Must be called before start().
      * 
      * @param receiveCallback 
      * @return I2SGen4_RK& 
@@ -668,7 +668,7 @@ public:
 
 
     /**
-     * @brief Set the receive callback to run at interrupt (ISR) level
+     * @brief Set the receive callback to run at interrupt (ISR) level. Must be called before start().
      * 
      * @param runAsISR 
      * @return I2SGen4_RK& 
@@ -692,8 +692,18 @@ public:
      */
     void loop();
 
+    /**
+     * @brief Start I2S streaming.
+     * 
+     * It's best to start it and leave it running, and put any gating in the fill or receive callbacks, rather than try to
+     * turn it on and off with any precision.
+     */
     void start();
 
+    /**
+     * @brief Stop I2S streaming.
+     * 
+     */
     void stop() { g_rtl_i2s_api.deinit(); };
 
     /**
@@ -742,18 +752,21 @@ protected:
     I2SGen4_RK& operator=(const I2SGen4_RK&) = delete;
 
     /**
-     * @brief Worker thread function
+     * @brief Worker thread function for transmit mode
      * 
-     * This method is called to perform operations in the worker thread.
-     * 
-     * You generally will not return from this method.
+     * There are two threads so each thread can wait on an os_queue, one for transmit and one for receive.
      */
     os_thread_return_t fillThreadFunction(void);
 
+    /**
+     * @brief Worker thread function for receive mode
+     * 
+     * There are two threads so each thread can wait on an os_queue, one for transmit and one for receive.
+     */
     os_thread_return_t receiveThreadFunction(void);
 
     /**
-     * @brief Function that is called to fill the buffer to send
+     * @brief Function that is called to fill the buffer to send. This is called from rtl_i2s.c via the API table.
      * 
      * @param buf 
      * @param bufSize 
@@ -761,8 +774,19 @@ protected:
      */
     static void fillCallbackStatic();
 
+    /**
+     * @brief Member function called from fillCallbackStatic
+     * 
+     * This runs at ISR level and determines if the settings are to defer using the queue to the worker thread
+     * or run immediately.
+     */
     void fillCallback();
 
+    /**
+     * @brief Internal function to handle filling the buffer for transmit
+     * 
+     * This can be called from the ISR (if transmit from ISR is enabled), or from the thread (if deferring)
+     */
     void fillCallbackInternal();
 
     /**
@@ -774,8 +798,19 @@ protected:
      */
     static void receiveCallbackStatic(void *buf);
 
+    /**
+     * @brief Member function called from receiveCallbackStatic
+     * 
+     * This runs at ISR level and determines if the settings are to defer using the queue to the worker thread
+     * or run immediately.
+     */
     void receiveCallback(void *buf);
 
+    /**
+     * @brief Internal function to handle saving the buffer for receive
+     * 
+     * This can be called from the ISR (if transmit from ISR is enabled), or from the thread (if deferring)
+     */
     void receiveCallbackInternal(void *buf);
 
     /**
@@ -783,6 +818,9 @@ protected:
      */
     std::function<void(void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount)> userFillCallback = 0;
 
+    /**
+     * @brief Whether to have the fill callback run at ISR level or not
+     */
     bool userFillCallbackRunAsISR = false;
 
     /**
@@ -791,6 +829,9 @@ protected:
      */
     std::function<void(const void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount)> userReceiveCallback = 0;
 
+    /**
+     * @brief Whether to have the receive callback run at ISR level or not
+     */
     bool userReceiveCallbackRunAsISR = false;
 
     /**
@@ -807,15 +848,22 @@ protected:
 
     /**
      * @brief Worker thread instance class
-     * 
-     * This is initialized in setup() so make sure you call the setup() method from the global application setup.
      */
     Thread *fillThread = 0;
 
-    Thread *receiveThread = 0;
-
+    /**
+     * @brief Queue for filling at non-ISR time
+     */
     os_queue_t fillQueue;
 
+    /**
+     * @brief Worker thread instance class
+     */
+    Thread *receiveThread = 0;
+
+    /**
+     * @brief Queue for receive buffers received at ISR and deferred to the worker thread.
+     */
     os_queue_t receiveQueue;
 
     /**

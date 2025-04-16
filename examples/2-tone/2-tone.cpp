@@ -9,6 +9,7 @@ SYSTEM_THREAD(ENABLED);
 
 SerialLogHandler logHandler(LOG_LEVEL_INFO);
 
+I2SGen4_RK::AudioSettings audioSettings;
 I2SGen4_TestSine16_RK testSine;
 const int sampleRate = 16000; // Hz
 
@@ -21,18 +22,23 @@ void setup()
     // The next line is only used during development to see early log messages
     waitFor(Serial.isConnected, 10000); delay(2000);
     
-    // bool I2SGen4_TestSine16_RK::allocate(int frequencyHz, int sampleRateHz) 
-    testSine.allocate(1000, sampleRate);
 
-    I2SGen4_RK::instance()
+
+    audioSettings
         .withSampleRateHz(sampleRate)
         .withStereo()
+        .withBits16();
+
+    testSine
+        .withAudioSettings(audioSettings)
+        .allocate(1000, sampleRate);
+
+    I2SGen4_RK::instance()
+        .withAudioSettings(audioSettings)
         .withDirection(I2SGen4_RK::Direction::TX_ONLY)
-        .withBits16()
         .withFillFromBufferStreamable(&testSine)
-        .withReceiveCallback([](const void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount) {
-        })
         .setup();
+
 
     I2SGen4_RK::instance().start();    
 
