@@ -396,6 +396,14 @@ public:
          */
         BufferConst(const uint8_t *buf, size_t bufSize) : buf(buf), bufSize(bufSize) { offsetAtomic.store(0); };
 
+        /**
+         * @brief Set the buffer to play continuously, looping back to the beginning after it has been played. Default is false.
+         * 
+         * @param continuousLoop 
+         * @return BufferConst& 
+         * 
+         * Once you start playing continuously, you can set the flag to false it will stop after the current buffer is finished.
+         */
         BufferConst &withContinuousLoop(bool continuousLoop = true) { this->continuousLoop = continuousLoop; return *this; };
 
         /**
@@ -459,7 +467,7 @@ public:
         const uint8_t *buf = nullptr; //!< The buffer passed into the constructor or set() method (not a copy)
         size_t bufSize = 0; //!< THe size of the buffer passed int othe constructor or set() method
 
-        bool continuousLoop = false;
+        bool continuousLoop = false; //!< True to start over from beginning after playing (default: false)
 
         /**
          * @brief Offset into the buffer using std::atomic
