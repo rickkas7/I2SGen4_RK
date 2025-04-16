@@ -74,7 +74,7 @@ public:
          * @param stereo true (default parameter) to set stereo
          * @return AudioSettings& 
          */
-        AudioSettings &withStereo(bool stereo) { this->stereo = stereo; return *this; };
+        AudioSettings &withStereo(bool stereo = true) { this->stereo = stereo; return *this; };
 
         /**
          * @brief Set the number of channels (1 or 2)
@@ -97,7 +97,7 @@ public:
          * 
          * @return int 
          */
-        int getChannels() const { return stereo ? 2 : 1; };
+        int getChannelCount() const { return stereo ? 2 : 1; };
 
         /**
          * @brief Set 16-bit mode. The default is 16-bit.
@@ -120,6 +120,20 @@ public:
          * @return int
          */
         bool getBits24() const { return bits24; };
+
+        /**
+         * @brief Get the number of bytes per sample, 2 for 16-bit and 4 for 24-bit
+         * 
+         * @return size_t 
+         */
+        size_t getBytesPerSample() const { return bits24 ? 4 : 2; };
+
+        /**
+         * @brief Get the number of sample frames (all channels) per RTL_I2S_DMA_PAGE_SIZE buffer
+         * 
+         * @return size_t 
+         */
+        size_t getSamplesFramesPerBuffer() const { return RTL_I2S_DMA_PAGE_SIZE / getBytesPerSample() / getChannelCount();  };
 
         /**
          * @brief Copy constructor
@@ -232,20 +246,31 @@ public:
      */
     class BufferStreamable {
     public:
+        BufferStreamable &withUserStreamCompletion(std::function<void()> userStreamCompletion) { this->userStreamCompletion = userStreamCompletion; return *this; };
         /**
          * @brief Returns true of at the end of the stream
          * 
          * @return true 
          * @return false 
          */
-        virtual bool atEOF() = 0;
+        virtual bool atEOF() const = 0;
 
         /**
          * @brief Call to copy the next page of RTL_I2S_DMA_PAGE_SIZE bytes
          * 
          * @param dest 
          */
-        virtual void copyPage(uint8_t *dest) = 0;        
+        virtual void copyPage(uint8_t *dest) = 0;
+
+        /**
+         * @brief Call to write a page. Supported on BufferVector, not supported on all streams
+         * 
+         * @param src The page to write, pointer to RTL_I2S_DMA_PAGE_SIZE bytes
+         */
+        virtual void writePage(const uint8_t *src) {};
+
+    protected:
+        std::function<void()> userStreamCompletion = 0;
     };
 
     /**
@@ -325,6 +350,13 @@ public:
          * This method is safe to call from an ISR. This method is part of the implementation of BufferStreamable.
          */
         virtual void copyPage(uint8_t *dest);
+
+        /**
+         * @brief Call to write a page. 
+         * 
+         * @param src The page to write, pointer to RTL_I2S_DMA_PAGE_SIZE bytes
+         */
+        virtual void writePage(const uint8_t *src);
 
 
     protected:
@@ -436,18 +468,6 @@ public:
         std::atomic<size_t> offsetAtomic;
     };
 
-    class SendBuffer {
-    public:
-        SendBuffer();
-        virtual ~SendBuffer();
-
-        SendBuffer(const void *buf, size_t bufSize);
-
-    protected:
-        const void *buf = nullptr;
-        size_t bufSize = 0;
-    };
-
 
     /**
      * @brief Gets the singleton instance of this class, allocating it if necessary
@@ -455,6 +475,14 @@ public:
      * Use I2SGen4_RK::instance() to instantiate the singleton.
      */
     static I2SGen4_RK &instance();
+
+    /**
+     * @brief Set the sample rate, number of channels, and number of bits. Must be called before setup.
+     * 
+     * @param settings 
+     * @return I2SGen4_RK& 
+     */
+    I2SGen4_RK &withAudioSettings(const AudioSettings &settings) { audioSettings = settings; return *this; };
 
     /**
      * @brief Set the sample rate in Hz. Default is 16000 Hz.
@@ -472,7 +500,7 @@ public:
      * 
      * @return int 
      */
-    int getSampleRateHz() const { return g_rtl_i2s_api.sampleRateHz; };
+    int getSampleRateHz() const { return audioSettings.getSampleRateHz(); };
 
     /**
      * @brief Sets mono (monophonic, single channel) mode. Default is stereo.
@@ -481,7 +509,7 @@ public:
      * 
      * Note: Mono 24-bit mode is not supported by the hardware!
      */
-    I2SGen4_RK &withMono() { g_rtl_i2s_api.stereo = false; return *this; };
+    I2SGen4_RK &withMono() { audioSettings.withMono(); return *this; };
 
     /**
      * @brief Sets stereo (stereophonic, two channel) mode. Default is stereo.
@@ -490,7 +518,7 @@ public:
      * 
      * @return I2SGen4_RK& 
      */
-    I2SGen4_RK &withStereo(bool stereo = true) { g_rtl_i2s_api.stereo = stereo; return *this; };
+    I2SGen4_RK &withStereo(bool stereo = true) { audioSettings.withStereo(stereo); return *this; };
 
     /**
      * @brief Get the stereo flag (stereo = true, mono = false)
@@ -498,14 +526,14 @@ public:
      * @return true 
      * @return false 
      */
-    bool getStereo(void) const { return g_rtl_i2s_api.stereo; };
+    bool getStereo(void) const { return audioSettings.getStereo(); };
 
     /**
      * @brief Sets 16-bit mode (the default)
      * 
      * @return I2SGen4_RK& 
      */
-    I2SGen4_RK &withBits16() { g_rtl_i2s_api.bits24 = false; return *this; };
+    I2SGen4_RK &withBits16() { audioSettings.withBits16(); return *this; };
 
     /**
      * @brief Sets 24- bit mode
@@ -515,7 +543,7 @@ public:
      * 
      * 32-bit mode is not supported.
      */
-    I2SGen4_RK &withBits24(bool bits24 = true) { g_rtl_i2s_api.bits24 = bits24; return *this; };
+    I2SGen4_RK &withBits24(bool bits24 = true) { audioSettings.withBits24(bits24); return *this; };
 
     /**
      * @brief Get the 24 bit flag (true = 24 bits, false = 16 bits)
@@ -523,7 +551,21 @@ public:
      * @return true 
      * @return false 
      */
-    bool getBits24(void) const { return g_rtl_i2s_api.bits24; };
+    bool getBits24(void) const { return audioSettings.getBits24(); };
+
+    /**
+     * @brief Get the current audio settings (const, for reading only)
+     * 
+     * @return const I2SGen4_RK::AudioSettings& 
+     */
+    const I2SGen4_RK::AudioSettings &getAudioSettings() const { return audioSettings; };
+
+    /**
+     * @brief Get the current audio settings (modifiable)
+     * 
+     * @return I2SGen4_RK::AudioSettings& 
+     */
+    I2SGen4_RK::AudioSettings &getAudioSettings() { return audioSettings; };
 
     /**
      * @brief Set the direction (RX, TX, or both). Default is I2SGen4_RK::Direction::RX_TX.
@@ -558,6 +600,14 @@ public:
      */
     int getDmaPageCount() const { return RTL_I2S_DMA_PAGE_COUNT; };
     
+    /**
+     * @brief Play audio from a BufferStreamable class (such as BufferVector, BufferConst, or I2SGen4_TestSine16_RK)
+     * 
+     * @param stream The stream to readFrom using copyPage
+     * @param runAsISR Run as ISR. Default value is true; BufferVector. BufferConst, and I2SGen4_TestSine16_RK are all ISR safe.
+     * @return I2SGen4_RK& 
+     */
+    I2SGen4_RK &withFillFromBufferStreamable(BufferStreamable *stream, bool runAsISR = true);    
 
     /**
      * @brief Set function that is called to fill a buffer with I2S samples to send
@@ -589,6 +639,14 @@ public:
      */
     I2SGen4_RK &withFillCallbackRunAsISR(bool runAsISR = true) { userFillCallbackRunAsISR = runAsISR; return *this; };
 
+    /**
+     * @brief Store audio in a BufferStreamable class (such as BufferVector)
+     * 
+     * @param stream The stream to write to using writePage
+     * @param runAsISR Run as ISR. Default value is true; BufferVector is ISR safe.
+     * @return I2SGen4_RK& 
+     */
+    I2SGen4_RK &withReceiveToBufferStreamable(BufferStreamable *stream, bool runAsISR = true);    
 
     /**
      * @brief Set the function to call when data is received by I2S.
@@ -745,7 +803,7 @@ protected:
     /**
      * @brief Currently selected audio settings, see methods like withSampleRate()
      */
-    AudioSettings audioSettings;
+    AudioSettings audioSettings; 
 
     /**
      * @brief Worker thread instance class
@@ -773,11 +831,17 @@ protected:
  * @brief Generate 16-bit sine wave data
  * 
  */
-class I2SGen4_TestSine16_RK {
+class I2SGen4_TestSine16_RK : public I2SGen4_RK::BufferStreamable {
 public:
     I2SGen4_TestSine16_RK();
 
     virtual ~I2SGen4_TestSine16_RK();
+
+    I2SGen4_TestSine16_RK &withSamplesFramesPerBuffer(size_t samplesFramesPerBuffer) { this->samplesFramesPerBuffer = samplesFramesPerBuffer; return *this; };
+
+    I2SGen4_TestSine16_RK &withChannelCount(size_t channelCount) { this->channelCount = channelCount; return *this; };
+
+    I2SGen4_TestSine16_RK &withAudioSettings(const I2SGen4_RK::AudioSettings &settings);
 
     /**
      * @brief Allocate a new sine wave sample
@@ -812,22 +876,27 @@ public:
     size_t getSampleCount() const { return sampleCount; };
 
     /**
-     * @brief Copies samples into a buffer. This method is ISR safe.
+     * @brief Always returns true so the sine wave is played continuously.
      * 
-     * @param samplesOut Buffer filled in with samples
-     * @param sampleOutCount Number of sample frames to write
-     * @param channelCount Number of channels (1 = mono, 2 = stereo)
-     *
-     * If you are writing a fill callback, these parameters are usee like this:
-     *  
-     *   .withFillCallback([](void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount) {
-     *       testSine.copySamples((int16_t *)buf, sampleCount, channelCount);
-     *   })
+     * @return true 
+     * 
+     * This method is safe to call from an ISR. This method is part of the implementation of BufferStreamable.
      */
-    void copySamples(int16_t *samplesOut, size_t sampleOutCount, size_t channelCount);
+    virtual bool atEOF() const { return false; };
+
+    /**
+     * @brief Copies RTL_I2S_DMA_PAGE_SIZE bytes of data to dest
+     * 
+     * @param dest Filled in with data 
+     * 
+     * This method is safe to call from an ISR. This method is part of the implementation of BufferStreamable.
+     */
+    virtual void copyPage(uint8_t *dest);
 
 protected:
     int16_t *samples = 0;
+    size_t samplesFramesPerBuffer = 0;
+    size_t channelCount = 1;
     size_t sampleCount = 0;
     size_t index = 0;
 };

@@ -49,6 +49,27 @@ void I2SGen4_RK::start() {
     g_rtl_i2s_api.init(); 
 }
 
+I2SGen4_RK &I2SGen4_RK::withFillFromBufferStreamable(BufferStreamable *stream, bool runAsISR) {
+    withFillCallback([stream](void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount) {
+        stream->copyPage((uint8_t *) buf); 
+    });
+    if (runAsISR) {
+        withFillCallbackRunAsISR();
+    }
+    return *this;
+}
+
+I2SGen4_RK &I2SGen4_RK::withReceiveToBufferStreamable(BufferStreamable *stream, bool runAsISR) {
+    withReceiveCallback([stream](const void *buf, size_t bufSize, size_t sampleCount, size_t bytesPerSample, size_t channelCount) {
+        stream->writePage((const uint8_t *) buf); 
+    });
+    if (runAsISR) {
+        withReceiveCallbackRunAsISR();
+    }
+    return *this;
+}
+
+
 
 os_thread_return_t I2SGen4_RK::fillThreadFunction(void) {
     while(true) {
@@ -194,6 +215,15 @@ void I2SGen4_RK::BufferVector::copyPage(uint8_t *dest) {
     }
 }
 
+void I2SGen4_RK::BufferVector::writePage(const uint8_t *src) {
+    if (!atEOF()) {
+        size_t tempIndex = indexAtomic.fetch_add(1);
+
+        memcpy(buffers[tempIndex]->buffer, src, Buffer::size);    
+    }
+}
+
+
 //
 // I2SGen4_RK::BufferConst
 // 
@@ -221,21 +251,6 @@ void I2SGen4_RK::BufferConst::copyPage(uint8_t *dest) {
 }
 
 
-        
-//
-// I2SGen4_RK::SendBuffer
-// 
-I2SGen4_RK::SendBuffer::SendBuffer() {
-
-}
-I2SGen4_RK::SendBuffer::~SendBuffer() {
-
-}
-
-I2SGen4_RK::SendBuffer::SendBuffer(const void *buf, size_t bufSize) {
-
-}
-
 //
 // I2SGen4_TestSine16_RK
 //
@@ -249,6 +264,12 @@ I2SGen4_TestSine16_RK::~I2SGen4_TestSine16_RK() {
     }
 }
 
+I2SGen4_TestSine16_RK &I2SGen4_TestSine16_RK::withAudioSettings(const I2SGen4_RK::AudioSettings &settings) {
+    channelCount = settings.getChannelCount();
+    samplesFramesPerBuffer = settings.getSamplesFramesPerBuffer();
+    return *this;
+}
+
 bool I2SGen4_TestSine16_RK::allocate(int frequencyHz, int samplesPerSecond) {
     const double pi = 3.14159265358979323846;
 
@@ -260,10 +281,6 @@ bool I2SGen4_TestSine16_RK::allocate(int frequencyHz, int samplesPerSecond) {
     if (sampleCount < 2) {
         return false;
     }
-
-    // Setting this to frequencyHz to 1000 is generating 6000 Hz
-    
-    // Log.info("sinePeriodSec=%lf samplePeriodSrc=%lf numSamples=%u", sinePeriodSec, samplePeriodSec, numSamples);
 
     if (samples) {
         delete[] samples;
@@ -294,16 +311,18 @@ int16_t I2SGen4_TestSine16_RK::getSample() {
     return result;
 }
 
-void I2SGen4_TestSine16_RK::copySamples(int16_t *samplesOut, size_t sampleOutCount, size_t channelCount) {
-    
+
+void I2SGen4_TestSine16_RK::copyPage(uint8_t *dest) {
     size_t index = 0;
-    for(size_t ii = 0; ii < sampleOutCount; ii++) {
+    for(size_t ii = 0; ii < samplesFramesPerBuffer; ii++) {
         int16_t value = getSample();
         for(size_t jj = 0; jj < channelCount; jj++) {
-            samplesOut[index++] = value;
+            ((int16_t *)dest)[index++] = value;
         }
     }
+
 }
+
 
 
 
