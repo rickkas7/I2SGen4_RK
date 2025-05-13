@@ -7,10 +7,10 @@ I2S (sound) support for Particle Gen 4 (RTL872x) devices
 
 | Device     | I2S     | PDM     |
 | :--------- | :-----: | :-----: |
-| P2         | &check; | &check; |
-| Photon 2   | &nbsp;  | &check; |
-| M-SoM      | &check; | &check; |
-| Muon       | &check; | &nbsp;  |
+| P2         | x       | x       |
+| Photon 2   |         | x       |
+| M-SoM      | x       | x       |
+| Muon       | x       |         |
 
 
 ### P2

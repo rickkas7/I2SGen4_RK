@@ -246,7 +246,14 @@ public:
      */
     class BufferStreamable {
     public:
+        /**
+         * @brief Set a function to call when all data has been sent
+         * 
+         * @param userStreamCompletion The function or C++ lambda to call
+         * @return BufferStreamable& 
+         */
         BufferStreamable &withUserStreamCompletion(std::function<void()> userStreamCompletion) { this->userStreamCompletion = userStreamCompletion; return *this; };
+        
         /**
          * @brief Returns true of at the end of the stream
          * 
@@ -269,8 +276,29 @@ public:
          */
         virtual void writePage(const uint8_t *src) {};
 
+        /**
+         * @brief Clear any state
+         */
+        virtual void clear();
+
     protected:
+        /**
+         * @brief Called by subclasses when copyPage is called and at EOF
+         * 
+         * This checks to see if a userStreamCompletion function is available and has 
+         * not been called yet, then calls it.
+         */
+        void handleUserStreamCompletion();
+
+        /**
+         * @brief Method called on first copyPage when at EOF
+         */
         std::function<void()> userStreamCompletion = 0;
+
+        /**
+         * @brief Flag to 
+         */
+        bool userStreamCompletionCalled = false;
     };
 
     /**
@@ -498,7 +526,7 @@ public:
     /**
      * @brief Set the sample rate in Hz. Default is 16000 Hz. Must be called before start().
      * 
-     * @param sampleRate 
+     * @param sampleRateHz The sample rate in Hz 
      * @return I2SGen4_RK& 
      * 
      * Valid values include: 8000, 16000, 24000, 32000, 48000, 96000, 44100.
@@ -778,10 +806,6 @@ protected:
 
     /**
      * @brief Function that is called to fill the buffer to send. This is called from rtl_i2s.c via the API table.
-     * 
-     * @param buf 
-     * @param bufSize 
-     * @return int 
      */
     static void fillCallbackStatic();
 
@@ -804,8 +828,6 @@ protected:
      * @brief Function that is called to process a buffer received
      * 
      * @param buf 
-     * @param bufSize 
-     * @return int 
      */
     static void receiveCallbackStatic(void *buf);
 

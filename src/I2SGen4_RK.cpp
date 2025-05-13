@@ -164,6 +164,21 @@ void I2SGen4_RK::receiveCallbackInternal(void *buf) {
     g_rtl_i2s_api.returnRecvPage(); 
 }
 
+// 
+// I2SGen4_RK::BufferStreamable
+//
+
+void I2SGen4_RK::BufferStreamable::clear() {
+    userStreamCompletionCalled = false;
+
+}
+
+void I2SGen4_RK::BufferStreamable::handleUserStreamCompletion() {
+    if (userStreamCompletion && !userStreamCompletionCalled) {
+        userStreamCompletionCalled = true;
+        userStreamCompletion();
+    }
+}
 
 //
 // I2SGen4_RK::BufferVector
@@ -184,6 +199,7 @@ void I2SGen4_RK::BufferVector::clear() {
     for(size_t ii = 0; ii < buffers.size(); ii++) {
         buffers[ii]->clear();
     }
+    BufferStreamable::clear();
 }
 
 bool I2SGen4_RK::BufferVector::allocate(size_t numBuffers) {
@@ -211,6 +227,7 @@ void I2SGen4_RK::BufferVector::copyPage(uint8_t *dest) {
         memcpy(dest, buffers[tempIndex]->buffer, Buffer::size);    
     }
     else {
+        BufferStreamable::handleUserStreamCompletion();
         memset(dest, 0, Buffer::size);
     }
 }
@@ -238,22 +255,43 @@ size_t I2SGen4_RK::BufferConst::getOffset() const {
 
 void I2SGen4_RK::BufferConst::copyPage(uint8_t *dest) {
     if (!atEOF()) {
-        size_t offset = offsetAtomic.fetch_add(RTL_I2S_DMA_PAGE_SIZE);
+        size_t destOffset = 0;
 
-        size_t count = bufSize - offset;
-        if (count > RTL_I2S_DMA_PAGE_SIZE) {
-            count = RTL_I2S_DMA_PAGE_SIZE;
-        }
-        memcpy(dest, &buf[offset], count);
-        if (count < RTL_I2S_DMA_PAGE_SIZE) {
-            memset(&dest[count], 0, RTL_I2S_DMA_PAGE_SIZE - count);
-        }
+        while(true) {
+            // RTL_I2S_DMA_PAGE_SIZE is in bytes
+            size_t offset = offsetAtomic.fetch_add(RTL_I2S_DMA_PAGE_SIZE);
 
-        if (continuousLoop && offsetAtomic.load() >= bufSize) {
-            offsetAtomic.store(0);
+            if (offset < bufSize) {
+                size_t count = bufSize - offset;        
+                if (count > (RTL_I2S_DMA_PAGE_SIZE - destOffset)) {
+                    count = (RTL_I2S_DMA_PAGE_SIZE - destOffset);
+                }
+                memcpy(&dest[destOffset], &buf[offset], count);  
+                destOffset += count;
+                
+                if (!continuousLoop) {
+                    if (destOffset < RTL_I2S_DMA_PAGE_SIZE) {
+                        memset(&dest[destOffset], 0, RTL_I2S_DMA_PAGE_SIZE - destOffset);
+                    }        
+                    break;
+                }
+                else
+                if (offsetAtomic.load() >= bufSize) {
+                    offsetAtomic.store(0);
+                }
+                else {
+                    break;
+                }
+        
+            }
+            else {
+                memset(&dest[destOffset], 0, RTL_I2S_DMA_PAGE_SIZE - destOffset);
+                break;
+            }
         }
     }
     else {
+        BufferStreamable::handleUserStreamCompletion();
         memset(dest, 0, Buffer::size);
     }
 }
