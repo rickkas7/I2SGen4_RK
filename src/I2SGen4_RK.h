@@ -136,6 +136,13 @@ public:
         size_t getSamplesFramesPerBuffer() const { return RTL_I2S_DMA_PAGE_SIZE / getBytesPerSample() / getChannelCount();  };
 
         /**
+         * @brief Get the number of seconds for each buffer
+         * 
+         * @return double 
+         */
+        double getSecondsPerBuffer() const { return (double)getSamplesFramesPerBuffer() / (double)getSampleRateHz(); };
+
+        /**
          * @brief Copy constructor
          * 
          * @param src 
@@ -397,6 +404,147 @@ public:
          * @brief index (0-based) into the vector. This is a std::atomic atomic variable.
          */
         std::atomic<size_t> indexAtomic;
+    };
+
+    /**
+     * @brief Similar to BufferVector, but uses two interrupt safe queues instead of a fixed vector
+     * 
+     * Use this so you can stream in or out from another thread safely while allowing more buffering
+     * so it won't skip if the system is busy doing other things.
+     */
+    class BufferQueue : public BufferStreamable {
+    public:
+        /**
+         * @brief Construct an object with no buffers allocated
+         */
+        BufferQueue();
+
+        /**
+         * @brief Destructor. This deletes the buffer pointers and empties the queues.
+         * 
+         */
+        virtual ~BufferQueue();
+
+        /**
+         * @brief Deletes the buffer pointers in the queues, then deletes the queues.
+         */
+        void free();
+
+        /**
+         * @brief Move all of the buffers from the ready queue into the free queue.
+         */
+        void clear();
+
+        /**
+         * @brief Allocate the specified number of buffers
+         * 
+         * @param numBuffers 
+         * @return true 
+         * @return false 
+         * 
+         * This deletes and previous buffers and rewinds to the beginning. If an out of memory condition
+         * occurs, false will be returned. The vector will contain as many buffers as could be allocated,
+         * but will still be valid.
+         */
+        bool allocate(size_t numBuffers);
+
+        /**
+         * @brief Returns true if the ready queue is empty
+         * 
+         * @return true 
+         * @return false 
+         * 
+         * This method is safe to call from an ISR. This method is part of the implementation of BufferStreamable.
+         */
+        virtual bool atEOF() const;
+
+        /**
+         * @brief Returns true if you can add a buffer using addBuffer (freeQueue is not empty).
+         * 
+         * @return true 
+         * @return false 
+         * 
+         * This is optional; you can just call addBuffer and if you don't get a callback of fn, then there was
+         * no free buffer available.
+         */
+        bool canAddBuffer() const;
+
+        /**
+         * @brief Add a buffer to the readyQueue if there is room
+         * 
+         * @param fn Function called to fill the buffer if needed
+         * 
+         * The fn function or lambda has the prototype:
+         * 
+         * bool fn(Buffer *buf)
+         * 
+         * Fill in buf with data and return true. If you have no data, return false.
+         * 
+         * You should not access buf after returning from fn; it will be owned by the I2S library and can be accessed
+         * by DMA so you should not save or modify buf after returning.
+         */
+        bool addBuffer(std::function<bool(Buffer *buf)> fn);
+
+        /**
+         * @brief Returns true if you can add a buffer using getBuffer (readyQueue is not empty).
+         * 
+         * @return true 
+         * @return false 
+         * 
+         * This is optional; you can just call getBuffer and if you don't get a callback of fn, then there was
+         * no ready buffer available.
+         */
+        bool canGetBuffer() const { return !atEOF(); };
+
+        /**
+         * @brief Get a buffer from the ready queue if there is one available
+         * 
+         * @param fn 
+         * @return true 
+         * @return false 
+         * 
+         * @param fn Function called to fill the buffer if needed
+         * 
+         * The fn function or lambda has the prototype:
+         * 
+         * void fn(Buffer *buf)
+         * 
+         * You should copy the buffer data out of buf before returning from your function. Normally you will not
+         * modify buf, but it's not declared const in case you need to mutate the buffer before returning because
+         * doing so would be more efficient. 
+         * 
+         * You should not access buf after returning from fn; it will be owned by the I2S library and will be 
+         * reused for new data.
+         */
+        bool getBuffer(std::function<void(Buffer *buf)> fn);
+
+
+        /**
+         * @brief Copy a buffer out of the vector into dest. Always copies RTL_I2S_DMA_PAGE_SIZE bytes.
+         * 
+         * @param dest 
+         * 
+         * If you are atEOF() then dest will be filled will bytes with a 0 value.
+         * 
+         * This method is safe to call from an ISR. This method is part of the implementation of BufferStreamable.
+         */
+        virtual void copyPage(uint8_t *dest);
+
+        /**
+         * @brief Call to write a page. 
+         * 
+         * @param src The page to write, pointer to RTL_I2S_DMA_PAGE_SIZE bytes
+         */
+        virtual void writePage(const uint8_t *src);
+
+
+    protected:
+        /**
+         * @brief Vector of Buffer objects. These objects are allocated during allocate() and are owned by this object.
+         */
+        os_queue_t freeQueue = nullptr;
+        os_queue_t readyQueue = nullptr;
+
     };
 
     /**

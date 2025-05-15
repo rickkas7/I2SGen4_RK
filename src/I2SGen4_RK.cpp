@@ -164,10 +164,11 @@ void I2SGen4_RK::receiveCallbackInternal(void *buf) {
     g_rtl_i2s_api.returnRecvPage(); 
 }
 
+
+
 // 
 // I2SGen4_RK::BufferStreamable
 //
-
 void I2SGen4_RK::BufferStreamable::clear() {
     userStreamCompletionCalled = false;
 
@@ -221,6 +222,7 @@ bool I2SGen4_RK::BufferVector::allocate(size_t numBuffers) {
 }
 
 void I2SGen4_RK::BufferVector::copyPage(uint8_t *dest) {
+    // Code in this method must be interrupt safe
     if (!atEOF()) {
         size_t tempIndex = indexAtomic.fetch_add(1);
 
@@ -233,6 +235,7 @@ void I2SGen4_RK::BufferVector::copyPage(uint8_t *dest) {
 }
 
 void I2SGen4_RK::BufferVector::writePage(const uint8_t *src) {
+    // Code in this method must be interrupt safe
     if (!atEOF()) {
         size_t tempIndex = indexAtomic.fetch_add(1);
 
@@ -240,12 +243,152 @@ void I2SGen4_RK::BufferVector::writePage(const uint8_t *src) {
     }
 }
 
+//
+// I2SGen4_RK::BufferQueue
+// 
+I2SGen4_RK::BufferQueue::BufferQueue() {
+
+}
+
+I2SGen4_RK::BufferQueue::~BufferQueue() {
+    free();
+}
+
+void I2SGen4_RK::BufferQueue::free() {
+    // This function will not be called at ISR time as it needs to free memory.
+    while(true) {
+        Buffer* buf = nullptr;
+        int res = os_queue_take(readyQueue, &buf, 0, nullptr);
+        if (res) {
+            break;
+        }
+        delete buf;
+    }
+    os_queue_destroy(readyQueue, nullptr);
+    readyQueue = nullptr;
+
+    while(true) {
+        Buffer* buf = nullptr;
+        int res = os_queue_take(freeQueue, &buf, 0, nullptr);
+        if (res) {
+            break;
+        }
+        delete buf;
+    }
+    os_queue_destroy(freeQueue, nullptr);
+    freeQueue = nullptr;
+}
+
+void I2SGen4_RK::BufferQueue::clear() {
+    while(true) {
+        Buffer* buf;
+        int res = os_queue_take(readyQueue, &buf, 0, nullptr);
+        if (res) {
+            break;
+        }
+        os_queue_put(freeQueue, &buf, 0, nullptr);
+    }
+}
+
+
+bool I2SGen4_RK::BufferQueue::allocate(size_t numBuffers) {
+    // This function will not be called at ISR time as it needs to allocate memory.
+    free();
+
+    int ret = os_queue_create(&readyQueue, sizeof(Buffer*), numBuffers, nullptr);
+    if (!ret) {
+        ret = os_queue_create(&freeQueue, sizeof(Buffer*), numBuffers, nullptr);
+    }
+
+    if (!ret) {
+        for(size_t ii = 0; ii < numBuffers; ii++) {
+            Buffer *buf = new Buffer();
+            if (!buf) {
+                ret = -1;
+                break;
+            }
+            os_queue_put(freeQueue, &buf, 0, nullptr);
+        }
+    }
+    return ret == 0;
+}
+
+bool I2SGen4_RK::BufferQueue::addBuffer(std::function<bool(Buffer *buf)> fn) {
+    bool pageAdded = false;
+
+    Buffer *buf = nullptr;
+    if (!os_queue_take(freeQueue, &buf, 0, nullptr)) {
+        pageAdded = fn(buf);
+        if (pageAdded) {
+            os_queue_put(readyQueue, &buf, 0, nullptr);            
+        }
+        else {
+            // User did not have a buffer, put it back
+            os_queue_put(freeQueue, &buf, 0, nullptr);            
+        }
+    }
+    return pageAdded;
+}
+
+bool I2SGen4_RK::BufferQueue::canAddBuffer() const {
+    // Code in this method must be interrupt safe
+
+    // Return true if there are no entries in the ready queue
+    Buffer *buf = nullptr;
+    return os_queue_peek(freeQueue, &buf, 0, nullptr) != 0;
+}
+
+
+bool I2SGen4_RK::BufferQueue::getBuffer(std::function<void(Buffer *buf)> fn) {
+    bool pageGotten = false;
+
+    Buffer *buf = nullptr;
+    if (!os_queue_take(readyQueue, &buf, 0, nullptr)) {
+        fn(buf);       
+        os_queue_put(freeQueue, &buf, 0, nullptr);            
+        pageGotten = true;
+    }
+
+    return pageGotten;
+}
+
+
+bool I2SGen4_RK::BufferQueue::atEOF() const {
+    // Code in this method must be interrupt safe
+
+    // Return true if there are no entries in the ready queue
+    Buffer *buf = nullptr;
+    return os_queue_peek(readyQueue, &buf, 0, nullptr) != 0;
+}
+
+
+void I2SGen4_RK::BufferQueue::copyPage(uint8_t *dest) {
+    // Code in this method must be interrupt safe
+    Buffer *buf = nullptr;
+    if (!os_queue_take(readyQueue, &buf, 0, nullptr)) {
+        memcpy(dest, buf->buffer, Buffer::size);
+        os_queue_put(freeQueue, &buf, 0, nullptr);
+    }
+    else {
+        memset(dest, 0, Buffer::size);
+    }
+}
+
+void I2SGen4_RK::BufferQueue::writePage(const uint8_t *src) {
+    // Code in this method must be interrupt safe
+    Buffer *buf = nullptr;
+    if (!os_queue_take(freeQueue, &buf, 0, nullptr)) {
+        memcpy(buf->buffer, src, Buffer::size);
+        os_queue_put(readyQueue, &buf, 0, nullptr);
+    }
+}
 
 //
 // I2SGen4_RK::BufferConst
 // 
 
 size_t I2SGen4_RK::BufferConst::getOffset() const { 
+    // Code in this method must be interrupt safe
     size_t offset = offsetAtomic.load(); 
     if (offset > bufSize) {
         offset = bufSize;
@@ -254,6 +397,7 @@ size_t I2SGen4_RK::BufferConst::getOffset() const {
 }
 
 void I2SGen4_RK::BufferConst::copyPage(uint8_t *dest) {
+    // Code in this method must be interrupt safe
     if (!atEOF()) {
         size_t destOffset = 0;
 
@@ -350,6 +494,7 @@ bool I2SGen4_TestSine16_RK::allocate(int frequencyHz, int samplesPerSecond) {
 }
 
 int16_t I2SGen4_TestSine16_RK::getSample() {
+    // Code in this method must be interrupt safe
     size_t tempIndex = indexAtomic.fetch_add(1);
 
     int16_t result = samples[tempIndex % sampleCount];
@@ -359,6 +504,7 @@ int16_t I2SGen4_TestSine16_RK::getSample() {
 
 
 void I2SGen4_TestSine16_RK::copyPage(uint8_t *dest) {
+    // Code in this method must be interrupt safe
     size_t index = 0;
     for(size_t ii = 0; ii < samplesFramesPerBuffer; ii++) {
         int16_t value = getSample();
