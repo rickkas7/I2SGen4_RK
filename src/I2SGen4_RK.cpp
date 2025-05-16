@@ -256,27 +256,31 @@ I2SGen4_RK::BufferQueue::~BufferQueue() {
 
 void I2SGen4_RK::BufferQueue::free() {
     // This function will not be called at ISR time as it needs to free memory.
-    while(true) {
-        Buffer* buf = nullptr;
-        int res = os_queue_take(readyQueue, &buf, 0, nullptr);
-        if (res) {
-            break;
+    if (readyQueue) {
+        while(true) {
+            Buffer* buf = nullptr;
+            int res = os_queue_take(readyQueue, &buf, 0, nullptr);
+            if (res) {
+                break;
+            }
+            delete buf;
         }
-        delete buf;
+        os_queue_destroy(readyQueue, nullptr);
+        readyQueue = nullptr;
     }
-    os_queue_destroy(readyQueue, nullptr);
-    readyQueue = nullptr;
 
-    while(true) {
-        Buffer* buf = nullptr;
-        int res = os_queue_take(freeQueue, &buf, 0, nullptr);
-        if (res) {
-            break;
+    if (freeQueue) {
+        while(true) {
+            Buffer* buf = nullptr;
+            int res = os_queue_take(freeQueue, &buf, 0, nullptr);
+            if (res) {
+                break;
+            }
+            delete buf;
         }
-        delete buf;
+        os_queue_destroy(freeQueue, nullptr);
+        freeQueue = nullptr;
     }
-    os_queue_destroy(freeQueue, nullptr);
-    freeQueue = nullptr;
 }
 
 void I2SGen4_RK::BufferQueue::clear() {
@@ -317,13 +321,13 @@ bool I2SGen4_RK::BufferQueue::addBuffer(std::function<bool(Buffer *buf)> fn) {
     bool pageAdded = false;
 
     Buffer *buf = nullptr;
-    if (!os_queue_take(freeQueue, &buf, 0, nullptr)) {
+    if (freeQueue && readyQueue && !os_queue_take(freeQueue, &buf, 0, nullptr)) {
         pageAdded = fn(buf);
         if (pageAdded) {
             os_queue_put(readyQueue, &buf, 0, nullptr);            
         }
         else {
-            // User did not have a buffer, put it back
+            // User did not have a buffer, put the buffer back in the free queue to use later
             os_queue_put(freeQueue, &buf, 0, nullptr);            
         }
     }
@@ -333,9 +337,14 @@ bool I2SGen4_RK::BufferQueue::addBuffer(std::function<bool(Buffer *buf)> fn) {
 bool I2SGen4_RK::BufferQueue::canAddBuffer() const {
     // Code in this method must be interrupt safe
 
-    // Return true if there are no entries in the ready queue
-    Buffer *buf = nullptr;
-    return os_queue_peek(freeQueue, &buf, 0, nullptr) != 0;
+    if (freeQueue && readyQueue) {
+        // Return true if there are no entries in the ready queue
+        Buffer *buf = nullptr;
+        return os_queue_peek(freeQueue, &buf, 0, nullptr) != 0;
+    }
+    else {
+        return false;
+    }
 }
 
 
@@ -343,7 +352,7 @@ bool I2SGen4_RK::BufferQueue::getBuffer(std::function<void(Buffer *buf)> fn) {
     bool pageGotten = false;
 
     Buffer *buf = nullptr;
-    if (!os_queue_take(readyQueue, &buf, 0, nullptr)) {
+    if (freeQueue && readyQueue && !os_queue_take(readyQueue, &buf, 0, nullptr)) {
         fn(buf);       
         os_queue_put(freeQueue, &buf, 0, nullptr);            
         pageGotten = true;
@@ -355,6 +364,9 @@ bool I2SGen4_RK::BufferQueue::getBuffer(std::function<void(Buffer *buf)> fn) {
 
 bool I2SGen4_RK::BufferQueue::atEOF() const {
     // Code in this method must be interrupt safe
+    if (!freeQueue || !readyQueue) {
+        return true;
+    }
 
     // Return true if there are no entries in the ready queue
     Buffer *buf = nullptr;
@@ -365,7 +377,7 @@ bool I2SGen4_RK::BufferQueue::atEOF() const {
 void I2SGen4_RK::BufferQueue::copyPage(uint8_t *dest) {
     // Code in this method must be interrupt safe
     Buffer *buf = nullptr;
-    if (!os_queue_take(readyQueue, &buf, 0, nullptr)) {
+    if (freeQueue && readyQueue && !os_queue_take(readyQueue, &buf, 0, nullptr)) {
         memcpy(dest, buf->buffer, Buffer::size);
         os_queue_put(freeQueue, &buf, 0, nullptr);
     }
@@ -377,7 +389,7 @@ void I2SGen4_RK::BufferQueue::copyPage(uint8_t *dest) {
 void I2SGen4_RK::BufferQueue::writePage(const uint8_t *src) {
     // Code in this method must be interrupt safe
     Buffer *buf = nullptr;
-    if (!os_queue_take(freeQueue, &buf, 0, nullptr)) {
+    if (freeQueue && readyQueue && !os_queue_take(freeQueue, &buf, 0, nullptr)) {
         memcpy(buf->buffer, src, Buffer::size);
         os_queue_put(readyQueue, &buf, 0, nullptr);
     }
